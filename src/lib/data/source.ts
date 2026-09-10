@@ -42,6 +42,8 @@ export const LOW_SHELF_FIELDS: InventoryTabFields = {
   boxes: "Closing Inventory No. of Boxes",
   location: "Location",
   name: "Description",
+  remarks: "Remarks",
+  remainingDays: "Remaining (days)",
 };
 
 /** Fetch + parse every source tab into the combined dashboard input. */

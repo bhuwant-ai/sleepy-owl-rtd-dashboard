@@ -54,6 +54,10 @@ export interface InventoryTabFields {
   boxes: string; // closing / available boxes (= cases)
   location: string;
   name: string;
+  /** Optional: column that flags stock as "Non Sellable" (Low Shelf Life tab). */
+  remarks?: string;
+  /** Optional: remaining-shelf-life-days column, used to drop expired stock. */
+  remainingDays?: string;
 }
 
 export function parseInventoryTab(
@@ -64,6 +68,8 @@ export function parseInventoryTab(
 ): ParseResult<InventoryBatch[]> {
   const issues: DataQualityIssue[] = [];
   const out: InventoryBatch[] = [];
+  let nonSellableCount = 0;
+  let expiredCount = 0;
 
   for (const row of objects(csv)) {
     const rawSku = (row[f.sku] || "").trim();
@@ -93,6 +99,23 @@ export function parseInventoryTab(
         });
       }
       continue;
+    }
+
+    // Business rule (Low Shelf Life tab): ignore inventory that is flagged
+    // "Non Sellable" or that already has negative (expired) shelf life.
+    if (f.remarks) {
+      const remark = (row[f.remarks] || "").trim().toLowerCase();
+      if (remark === "non sellable" || remark === "non-sellable") {
+        nonSellableCount++;
+        continue;
+      }
+    }
+    if (f.remainingDays) {
+      const rem = numOrNull(row[f.remainingDays]);
+      if (rem != null && rem < 0) {
+        expiredCount++;
+        continue;
+      }
     }
 
     const cases = num(row[f.boxes]);
@@ -139,6 +162,24 @@ export function parseInventoryTab(
       exp,
       totalShelfLifeDays: numOrNull(row[f.shelf]),
       cases,
+    });
+  }
+
+  // One concise summary per exclusion type (instead of one line per batch).
+  if (nonSellableCount > 0) {
+    issues.push({
+      severity: "info",
+      code: "EXCLUDED_NON_SELLABLE",
+      message: `Excluded ${nonSellableCount} non-sellable batch${nonSellableCount === 1 ? "" : "es"}.`,
+      context: source,
+    });
+  }
+  if (expiredCount > 0) {
+    issues.push({
+      severity: "info",
+      code: "EXCLUDED_NEGATIVE_SHELF_LIFE",
+      message: `Excluded ${expiredCount} expired batch${expiredCount === 1 ? "" : "es"} (negative shelf life).`,
+      context: source,
     });
   }
   return { data: out, issues };
