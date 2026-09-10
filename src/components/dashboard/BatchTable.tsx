@@ -32,8 +32,9 @@ export function BatchTable({ rows }: { rows: BatchRow[] }) {
       .sort((a, b) => (a.remainingPct ?? 999) - (b.remainingPct ?? 999));
   }, [rows, loc, bucket, q]);
 
-  const selCls =
-    "rounded-md border border-[var(--border)] bg-white px-2 py-1 text-xs text-[var(--foreground)]";
+  const ctrl =
+    "rounded-lg glass px-2.5 py-1.5 text-[12px] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]";
+  const th = "sticky top-0 z-[1] bg-[var(--card)] px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)] border-b border-[var(--border)]";
 
   return (
     <div>
@@ -42,55 +43,59 @@ export function BatchTable({ rows }: { rows: BatchRow[] }) {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search SKU / batch / location…"
-          className={selCls + " min-w-[200px]"}
+          className={ctrl + " min-w-[210px] flex-1 sm:flex-none"}
         />
-        <select value={loc} onChange={(e) => setLoc(e.target.value as typeof loc)} className={selCls}>
+        <select value={loc} onChange={(e) => setLoc(e.target.value as typeof loc)} className={ctrl} aria-label="Location">
           <option value="all">All locations</option>
           <option value="JWL">JWL</option>
           <option value="VENDOR">Vendor</option>
         </select>
-        <select value={bucket} onChange={(e) => setBucket(e.target.value as typeof bucket)} className={selCls}>
+        <select value={bucket} onChange={(e) => setBucket(e.target.value as typeof bucket)} className={ctrl} aria-label="Shelf-life bucket">
           <option value="all">All shelf-life</option>
           <option value="ABOVE_70">Above 70%</option>
           <option value="BETWEEN_50_70">50–70%</option>
           <option value="BELOW_50">Below 50%</option>
           <option value="UNKNOWN">Unknown</option>
         </select>
-        <span className="text-xs text-[var(--muted)] ml-auto">{filtered.length} batches</span>
+        <span className="ml-auto text-[11px] text-[var(--muted)] tabnum">{filtered.length} batches</span>
       </div>
 
-      <div className="scroll-x max-h-[520px] overflow-y-auto rounded-lg border border-[var(--border)]">
-        <table className="w-full min-w-[840px] border-collapse text-sm">
+      <div className="scroll-x max-h-[520px] overflow-y-auto rounded-xl border border-[var(--hairline)]">
+        <table className="w-full min-w-[860px] border-collapse text-[12.5px]">
           <thead>
-            <tr className="sticky top-0 z-[1] bg-[var(--card)] border-b border-[var(--border)] text-[var(--muted)] shadow-[0_1px_0_var(--border)]">
-              <th className="px-2.5 py-2 text-left font-semibold">SKU</th>
-              <th className="px-2.5 py-2 text-left font-semibold">Location</th>
-              <th className="px-2.5 py-2 text-left font-semibold">Batch</th>
-              <th className="px-2.5 py-2 text-left font-semibold">Mfg date</th>
-              <th className="px-2.5 py-2 text-right font-semibold">Cases</th>
-              <th className="px-2.5 py-2 text-right font-semibold">Shelf life</th>
-              <th className="px-2.5 py-2 text-left font-semibold">70% date</th>
-              <th className="px-2.5 py-2 text-left font-semibold">Bucket</th>
+            <tr>
+              <th className={th + " text-left"}>SKU</th>
+              <th className={th + " text-left"}>Location</th>
+              <th className={th + " text-left"}>Batch</th>
+              <th className={th + " text-left"}>Mfg date</th>
+              <th className={th + " text-right"}>Cases</th>
+              <th className={th + " text-right"}>Shelf life</th>
+              <th className={th + " text-left"}>70% date</th>
+              <th className={th + " text-left"}>Bucket</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map((r, i) => {
               const meta = r.bucket ? BUCKET_META[r.bucket] : null;
+              const isVendor = r.locationType === "VENDOR";
               return (
-                <tr key={i} className="border-b border-[var(--border)] last:border-0 hover:bg-black/[0.02]">
-                  <td className="px-2.5 py-2 font-medium whitespace-nowrap">{r.sku}</td>
-                  <td className="px-2.5 py-2 whitespace-nowrap">
-                    <Badge bg={r.locationType === "VENDOR" ? "#ede9fe" : "#e0f2fe"} color={r.locationType === "VENDOR" ? "#6d28d9" : "#0369a1"}>
-                      {r.locationType === "VENDOR" ? "Vendor" : "JWL"}
+                <tr key={i} className="border-b border-[var(--hairline)] last:border-0 hover:bg-[var(--hover)] transition-colors">
+                  <td className="whitespace-nowrap px-3 py-2.5 font-medium">{r.sku}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5">
+                    <Badge
+                      bg={isVendor ? "color-mix(in oklab, var(--brand-sky) 15%, transparent)" : "color-mix(in oklab, var(--primary) 14%, transparent)"}
+                      color={isVendor ? "var(--brand-sky)" : "var(--primary)"}
+                    >
+                      {isVendor ? "Vendor" : "JWL"}
                     </Badge>{" "}
-                    <span className="text-xs text-[var(--muted)]">{r.location}</span>
+                    <span className="text-[11px] text-[var(--muted)]">{r.location}</span>
                   </td>
-                  <td className="px-2.5 py-2 whitespace-nowrap text-xs">{r.batchNo || "—"}</td>
-                  <td className="px-2.5 py-2 whitespace-nowrap">{fmtDate(r.mfd)}</td>
-                  <td className="px-2.5 py-2 text-right tabular-nums">{fmtInt(r.cases)}</td>
-                  <td className="px-2.5 py-2 text-right tabular-nums">{fmtPct(r.remainingPct)}</td>
-                  <td className="px-2.5 py-2 whitespace-nowrap">{fmtDate(r.date70)}</td>
-                  <td className="px-2.5 py-2 whitespace-nowrap">
+                  <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[var(--muted)]">{r.batchNo || "—"}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 tabnum">{fmtDate(r.mfd)}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right tabnum">{fmtInt(r.cases)}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-right tabnum">{fmtPct(r.remainingPct)}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 tabnum">{fmtDate(r.date70)}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5">
                     {meta ? (
                       <Badge bg={meta.bg} color={meta.text}>
                         {meta.label}
@@ -104,7 +109,7 @@ export function BatchTable({ rows }: { rows: BatchRow[] }) {
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-2.5 py-6 text-center text-[var(--muted)]">
+                <td colSpan={8} className="px-3 py-6 text-center text-[var(--muted)]">
                   No batches match the current filters.
                 </td>
               </tr>

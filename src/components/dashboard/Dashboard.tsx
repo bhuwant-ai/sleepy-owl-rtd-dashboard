@@ -1,10 +1,22 @@
 "use client";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import {
+  Warehouse,
+  ShieldCheck,
+  Clock3,
+  AlertTriangle,
+  Truck,
+  Coffee,
+  RefreshCw,
+  RotateCcw,
+  Sun,
+  Moon,
+} from "lucide-react";
 import type { DashboardData, CoverageView } from "@/lib/calc/dashboard";
 import type { Category } from "@/lib/types";
-import { fmtInt, fmtPct, fmtDays, fmtDate, addDaysIso } from "@/lib/format";
-import { StatCard, SectionCard, Card, Badge, cn } from "./ui";
+import { fmtInt, fmtPct, addDaysIso } from "@/lib/format";
+import { StatCard, SectionCard, Card, Badge, IconButton, cn } from "./ui";
 import { ShelfChart } from "./ShelfChart";
 import { SkuTable } from "./SkuTable";
 import { BatchTable } from "./BatchTable";
@@ -17,6 +29,19 @@ export function Dashboard({ data }: { data: DashboardData }) {
   const [pending, startTransition] = useTransition();
   const [category, setCategory] = useState<"all" | Category>("all");
   const [sku, setSku] = useState<"all" | string>("all");
+
+  // --- presentational-only theme toggle (light/dark) ---
+  const [dark, setDark] = useState(false);
+  useEffect(() => setDark(document.documentElement.classList.contains("dark")), []);
+  const toggleTheme = () => {
+    const el = document.documentElement;
+    const next = !el.classList.contains("dark");
+    el.classList.toggle("dark", next);
+    try {
+      localStorage.setItem("theme", next ? "dark" : "light");
+    } catch {}
+    setDark(next);
+  };
 
   const skuOptions = data.skus.filter((s) => category === "all" || s.category === category);
 
@@ -72,94 +97,113 @@ export function Dashboard({ data }: { data: DashboardData }) {
     }
     startTransition(() => router.refresh());
   };
-  const selCls = "rounded-md border border-[var(--border)] bg-white px-2.5 py-1.5 text-sm";
+
+  const selCls =
+    "rounded-lg glass px-2.5 py-1.5 text-[12px] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]";
+
+  const filtered = category !== "all" || sku !== "all";
+
+  const kpis = [
+    { label: "Total JWL", value: fmtInt(k.jwl), sub: "Racks + Low Shelf Life", accent: "var(--primary)", icon: <Warehouse className="h-4 w-4" /> },
+    { label: "Above 70%", value: fmtInt(k.above), sub: `${fmtPct(k.abovePct)} of JWL`, accent: "var(--good)", icon: <ShieldCheck className="h-4 w-4" /> },
+    { label: "50–70%", value: fmtInt(k.between), sub: `${fmtPct(k.betweenPct)} of JWL`, accent: "var(--warn)", icon: <Clock3 className="h-4 w-4" /> },
+    { label: "Below 50%", value: fmtInt(k.below), sub: `${fmtPct(k.belowPct)} of JWL`, accent: "var(--bad)", icon: <AlertTriangle className="h-4 w-4" /> },
+    { label: "At Vendor", value: fmtInt(k.vendor), sub: "Lotus (separate)", accent: "var(--brand-sky)", icon: <Truck className="h-4 w-4" /> },
+  ];
 
   return (
     <div className="min-h-full">
-      {/* Header */}
-      <header className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--card)]/95 backdrop-blur">
-        <div className="mx-auto max-w-[1400px] px-4 sm:px-6 py-3 flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="h-9 w-9 rounded-lg bg-[var(--brand)] text-white grid place-items-center text-lg">☕</div>
+      {/* Sticky glass header */}
+      <header className="no-print sticky top-0 z-30 border-b border-[var(--hairline)] bg-background/85 backdrop-blur-xl anim-in-header">
+        <div className="mx-auto max-w-[1400px] px-4 sm:px-6 py-3 flex flex-wrap items-center gap-x-4 gap-y-3">
+          <div className="flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-[var(--brand-indigo)] via-[var(--brand-violet)] to-[var(--brand-sky)] text-white shadow-sm">
+              <Coffee className="h-5 w-5" />
+            </div>
             <div>
-              <h1 className="text-lg font-bold leading-tight">Sleepy Owl — RTD Inventory Dashboard</h1>
-              <p className="text-xs text-[var(--muted)]">RTD Cans &amp; Bottles · JWL warehouse &amp; vendor</p>
+              <div className="flex items-center gap-1.5">
+                <span className="ping-dot" />
+                <span className="eyebrow">RTD Inventory · Live</span>
+              </div>
+              <h1 className="text-[22px] font-bold leading-tight tracking-tight">Sleepy Owl RTD Dashboard</h1>
+              <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[var(--muted)]">
+                <span className="font-medium text-[var(--foreground)]">{data.month.label}</span>
+                <span aria-hidden>·</span>
+                <span className="tabnum">Updated {new Date(data.generatedAt).toLocaleString("en-IN")}</span>
+                <span aria-hidden>·</span>
+                <span>Source: Google Sheets → Supabase</span>
+              </div>
             </div>
           </div>
-          <div className="ml-auto flex items-center gap-3 text-xs text-[var(--muted)]">
-            <div className="text-right">
-              <div className="font-semibold text-[var(--foreground)]">{data.month.label}</div>
-              <div>Data as of {new Date(data.generatedAt).toLocaleString("en-IN")}</div>
-            </div>
+
+          {/* Filters + actions, pinned right */}
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <select
+              className={selCls}
+              aria-label="Category filter"
+              value={category}
+              onChange={(e) => {
+                setCategory(e.target.value as typeof category);
+                setSku("all");
+              }}
+            >
+              <option value="all">All categories</option>
+              <option value="RTD Cans">RTD Cans</option>
+              <option value="RTD Bottles">RTD Bottles</option>
+            </select>
+            <select className={selCls} aria-label="SKU filter" value={sku} onChange={(e) => setSku(e.target.value)}>
+              <option value="all">All SKUs</option>
+              {skuOptions.map((s) => (
+                <option key={s.sku} value={s.sku}>
+                  {s.sku}
+                </option>
+              ))}
+            </select>
+            {filtered && (
+              <IconButton label="Reset filters" onClick={() => { setCategory("all"); setSku("all"); }}>
+                <RotateCcw className="h-4 w-4" />
+              </IconButton>
+            )}
             <button
               onClick={refresh}
               disabled={pending}
-              className="rounded-md bg-[var(--brand)] px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3 py-1.5 text-[12px] font-medium text-[var(--primary-foreground)] press hover:opacity-90 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
             >
-              {pending ? "Refreshing…" : "↻ Refresh data"}
+              <RefreshCw className={cn("h-3.5 w-3.5", pending && "animate-spin")} />
+              {pending ? "Refreshing…" : "Refresh"}
             </button>
+            <IconButton label="Toggle light / dark theme" onClick={toggleTheme}>
+              {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </IconButton>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1400px] px-4 sm:px-6 py-5 space-y-5">
-        {/* Filters */}
-        <Card className="p-3 flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-[var(--muted)] mr-1">Filters:</span>
-          <select
-            className={selCls}
-            value={category}
-            onChange={(e) => {
-              setCategory(e.target.value as typeof category);
-              setSku("all");
-            }}
-          >
-            <option value="all">All categories</option>
-            <option value="RTD Cans">RTD Cans</option>
-            <option value="RTD Bottles">RTD Bottles</option>
-          </select>
-          <select className={selCls} value={sku} onChange={(e) => setSku(e.target.value)}>
-            <option value="all">All SKUs</option>
-            {skuOptions.map((s) => (
-              <option key={s.sku} value={s.sku}>
-                {s.sku}
-              </option>
-            ))}
-          </select>
-          {(category !== "all" || sku !== "all") && (
-            <button
-              onClick={() => {
-                setCategory("all");
-                setSku("all");
-              }}
-              className="text-xs text-[var(--brand)] underline"
-            >
-              Reset
-            </button>
-          )}
-          <span className="ml-auto text-xs text-[var(--muted)]">
-            Coverage &amp; DOH use <strong>JWL only</strong>; 70%+ means strictly above 70%.
-          </span>
-        </Card>
+      <main className="mx-auto max-w-[1400px] px-4 sm:px-6 py-6 space-y-6">
+        <p className="text-[11px] text-[var(--muted)] -mt-1">
+          Coverage &amp; DOH use <strong className="text-[var(--foreground)]">JWL only</strong>; “70%+” means strictly above 70% remaining shelf life.
+        </p>
 
         {/* Section 1 — Inventory overview */}
         <section>
-          <h2 className="mb-2 text-sm font-semibold text-[var(--muted)] uppercase tracking-wide">Inventory overview</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-            <StatCard label="Total JWL" value={fmtInt(k.jwl)} unit="cases" sub="Racks + Low Shelf Life" />
-            <StatCard label="Above 70%" value={fmtInt(k.above)} unit="cases" sub={fmtPct(k.abovePct) + " of JWL"} accent="var(--good)" />
-            <StatCard label="50–70%" value={fmtInt(k.between)} unit="cases" sub={fmtPct(k.betweenPct) + " of JWL"} accent="var(--warn)" />
-            <StatCard label="Below 50%" value={fmtInt(k.below)} unit="cases" sub={fmtPct(k.belowPct) + " of JWL"} accent="var(--bad)" />
-            <StatCard label="At Vendor" value={fmtInt(k.vendor)} unit="cases" sub="Lotus (separate)" accent="var(--brand-2)" />
+          <div className="eyebrow mb-2.5">Inventory overview</div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {kpis.map((c, i) => (
+              <div key={c.label} className="anim-in" style={{ animationDelay: `${0.05 * i}s` }}>
+                <StatCard label={c.label} value={c.value} unit="cases" sub={c.sub} accent={c.accent} icon={c.icon} />
+              </div>
+            ))}
           </div>
         </section>
 
-        {/* Section 2 — shelf-life split + coverage headline */}
-        <div className="grid lg:grid-cols-3 gap-5">
-          <SectionCard title="Inventory by shelf life" subtitle="Share of JWL stock by remaining shelf life">
-            <ShelfChart above70={k.above} between={k.between} below={k.below} total={k.jwl} />
-          </SectionCard>
-          <div className="lg:col-span-2">
+        {/* Section 2 — shelf-life split + coverage */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
+          <div className="anim-in" style={{ animationDelay: "0.1s" }}>
+            <SectionCard title="Inventory by shelf life" subtitle="Share of JWL stock by remaining shelf life">
+              <ShelfChart above70={k.above} between={k.between} below={k.below} total={k.jwl} />
+            </SectionCard>
+          </div>
+          <div className="xl:col-span-2 anim-in" style={{ animationDelay: "0.15s" }}>
             <SectionCard
               title="70%+ stock coverage (FEFO)"
               subtitle="How long JWL stock above 70% shelf life lasts, accounting for batches that age out"
@@ -170,43 +214,60 @@ export function Dashboard({ data }: { data: DashboardData }) {
         </div>
 
         {/* Section 3 — SKU table */}
-        <SectionCard title="SKU inventory & metrics" subtitle="JWL by shelf-life bucket, vendor, sales, demand, DRR and DOH">
-          <SkuTable rows={filteredSkus} />
-        </SectionCard>
+        <div className="anim-in" style={{ animationDelay: "0.2s" }}>
+          <SectionCard title="SKU inventory & metrics" subtitle="JWL by shelf-life bucket, vendor, sales, demand, DRR and DOH">
+            <SkuTable rows={filteredSkus} />
+          </SectionCard>
+        </div>
 
         {/* Section 4 — batch table */}
-        <SectionCard title="Batch / vendor inventory" subtitle="Every batch × location with shelf-life status and 70% date">
-          <BatchTable rows={batchesFiltered} />
-        </SectionCard>
+        <div className="anim-in" style={{ animationDelay: "0.25s" }}>
+          <SectionCard title="Batch / vendor inventory" subtitle="Every batch × location with shelf-life status and 70% date">
+            <BatchTable rows={batchesFiltered} />
+          </SectionCard>
+        </div>
 
         {/* Data quality */}
-        <SectionCard
-          title="Data quality"
-          subtitle="Issues detected while reading the sheets"
-          right={<Badge bg={data.dataQuality.length ? "var(--warn-bg)" : "var(--good-bg)"} color={data.dataQuality.length ? "var(--warn)" : "var(--good)"}>{data.dataQuality.length} issues</Badge>}
-        >
-          {data.dataQuality.length === 0 ? (
-            <p className="text-sm text-[var(--muted)]">No data-quality issues detected. ✅</p>
-          ) : (
-            <ul className="space-y-1.5 text-sm">
-              {data.dataQuality.map((i, idx) => (
-                <li key={idx} className="flex items-start gap-2">
-                  <span
-                    className={cn(
-                      "mt-0.5 inline-block h-2 w-2 rounded-full shrink-0",
-                      i.severity === "error" ? "bg-[var(--bad)]" : i.severity === "warning" ? "bg-[var(--warn)]" : "bg-slate-400"
-                    )}
-                  />
-                  <span>
-                    <span className="text-[var(--muted)]">[{i.context || i.code}]</span> {i.message}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </SectionCard>
+        <div className="anim-in" style={{ animationDelay: "0.3s" }}>
+          <SectionCard
+            title="Data quality"
+            subtitle="Issues detected while reading the sheets"
+            right={
+              <Badge
+                bg={data.dataQuality.length ? "var(--warn-bg)" : "var(--good-bg)"}
+                color={data.dataQuality.length ? "var(--warn)" : "var(--good)"}
+              >
+                {data.dataQuality.length} issues
+              </Badge>
+            }
+          >
+            {data.dataQuality.length === 0 ? (
+              <p className="text-[13px] text-[var(--muted)]">No data-quality issues detected.</p>
+            ) : (
+              <ul className="grid gap-2 sm:grid-cols-2">
+                {data.dataQuality.map((i, idx) => (
+                  <li
+                    key={idx}
+                    className="flex items-start gap-2.5 rounded-xl border border-[var(--hairline)] bg-[var(--hover)] px-3 py-2 text-[12px]"
+                  >
+                    <span
+                      className={cn(
+                        "mt-1 inline-block h-2 w-2 rounded-full shrink-0",
+                        i.severity === "error" ? "bg-[var(--bad)]" : i.severity === "warning" ? "bg-[var(--warn)]" : "bg-[var(--muted)]"
+                      )}
+                    />
+                    <span>
+                      <span className="eyebrow mr-1 align-middle">{i.context || i.code}</span>
+                      <span className="text-[var(--foreground)]">{i.message}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SectionCard>
+        </div>
 
-        <footer className="py-4 text-center text-xs text-[var(--muted)]">
+        <footer className="no-print py-4 text-center text-[11px] text-[var(--muted)]">
           Sleepy Owl RTD Dashboard · {data.month.label} · {data.month.elapsedDays} elapsed days · {data.month.daysInMonth}-day month
         </footer>
       </main>

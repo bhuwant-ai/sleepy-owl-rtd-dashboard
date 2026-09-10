@@ -8,13 +8,12 @@ type Col = {
   key: keyof SkuRow;
   label: string;
   render: (r: SkuRow) => string;
-  align?: "left" | "right";
   numeric?: boolean;
 };
 
 const COLS: Col[] = [
-  { key: "sku", label: "SKU", render: (r) => r.sku, align: "left" },
-  { key: "category", label: "Category", render: (r) => r.category, align: "left" },
+  { key: "sku", label: "SKU", render: (r) => r.sku },
+  { key: "category", label: "Category", render: (r) => r.category },
   { key: "jwlCases", label: "JWL", render: (r) => fmtInt(r.jwlCases), numeric: true },
   { key: "above70Cases", label: ">70%", render: (r) => fmtInt(r.above70Cases), numeric: true },
   { key: "between5070Cases", label: "50–70%", render: (r) => fmtInt(r.between5070Cases), numeric: true },
@@ -49,36 +48,39 @@ export function SkuTable({ rows }: { rows: SkuRow[] }) {
     }
   };
 
+  const stickyFirst = "sticky left-0 z-[1] bg-[var(--card)] shadow-[7px_0_12px_-10px_rgba(15,23,42,0.25)]";
+
   return (
-    <div className="scroll-x -mx-1">
-      <table className="w-full min-w-[900px] border-collapse text-sm">
+    <div className="scroll-x rounded-xl border border-[var(--hairline)]">
+      <table className="w-full min-w-[920px] border-collapse text-[12.5px]">
         <thead>
-          <tr className="border-b border-[var(--border)]">
-            {COLS.map((c) => (
+          <tr className="bg-[var(--card)]">
+            {COLS.map((c, ci) => (
               <th
                 key={String(c.key)}
                 onClick={() => clickSort(c.key)}
                 className={cn(
-                  "cursor-pointer select-none px-2.5 py-2 font-semibold text-[var(--muted)] whitespace-nowrap",
-                  c.numeric ? "text-right" : "text-left"
+                  "sticky top-0 z-[2] cursor-pointer select-none whitespace-nowrap px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)] border-b border-[var(--border)] bg-[var(--card)]",
+                  c.numeric ? "text-right" : "text-left",
+                  ci === 0 && "left-0 z-[3] shadow-[7px_0_12px_-10px_rgba(15,23,42,0.25)]"
                 )}
               >
                 {c.label}
-                {sortKey === c.key && <span className="ml-1">{dir === "asc" ? "▲" : "▼"}</span>}
+                {sortKey === c.key && <span className="ml-1 text-[var(--primary)]">{dir === "asc" ? "▲" : "▼"}</span>}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
           {sorted.map((r) => (
-            <tr key={r.sku} className="border-b border-[var(--border)] last:border-0 hover:bg-black/[0.02]">
-              {COLS.map((c) => (
+            <tr key={r.sku} className="border-b border-[var(--hairline)] last:border-0 hover:bg-[var(--hover)] transition-colors">
+              {COLS.map((c, ci) => (
                 <td
                   key={String(c.key)}
                   className={cn(
-                    "px-2.5 py-2 whitespace-nowrap tabular-nums",
-                    c.numeric ? "text-right" : "text-left",
-                    c.key === "sku" && "font-medium"
+                    "whitespace-nowrap px-3 py-2.5",
+                    c.numeric ? "text-right tabnum" : "text-left",
+                    ci === 0 && cn(stickyFirst, "font-medium")
                   )}
                 >
                   {c.render(r)}
@@ -88,7 +90,7 @@ export function SkuTable({ rows }: { rows: SkuRow[] }) {
           ))}
           {sorted.length === 0 && (
             <tr>
-              <td colSpan={COLS.length} className="px-2.5 py-6 text-center text-[var(--muted)]">
+              <td colSpan={COLS.length} className="px-3 py-6 text-center text-[var(--muted)]">
                 No SKUs match the current filters.
               </td>
             </tr>

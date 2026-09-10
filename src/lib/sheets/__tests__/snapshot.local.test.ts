@@ -25,7 +25,9 @@ const FILES = {
   demand: "demand_sep26.csv",
 };
 const ready = !!DIR && Object.values(FILES).every((f) => existsSync(join(DIR!, f)));
-const read = (f: string) => readFileSync(join(DIR!, f), "utf8");
+// Guard against DIR being undefined: describe.skip still runs the callback
+// body during collection, so read() must not throw when we're skipping.
+const read = (f: string) => (DIR ? readFileSync(join(DIR, f), "utf8") : "");
 
 (ready ? describe : describe.skip)("real-data snapshot validation", () => {
   const jwl = parseInventoryTab(read(FILES.jwl), "JWL_RACKS", "JWL", JWL_FIELDS);

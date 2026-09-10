@@ -10,15 +10,20 @@ export function CoverageCards({ sales, demand }: { sales: CoverageView; demand: 
 
   return (
     <div>
-      {/* basis toggle */}
-      <div className="inline-flex rounded-lg border border-[var(--border)] bg-white p-0.5 mb-4">
+      {/* sliding segmented toggle */}
+      <div className="relative mb-4 inline-flex rounded-lg glass p-0.5 text-[12px] font-medium">
+        <span
+          className="absolute inset-y-0.5 left-0.5 w-[calc(50%-2px)] rounded-md bg-[var(--primary)] shadow-sm transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+          style={{ transform: basis === "SALES" ? "translateX(0)" : "translateX(100%)" }}
+          aria-hidden
+        />
         {(["SALES", "DEMAND"] as const).map((b) => (
           <button
             key={b}
             onClick={() => setBasis(b)}
             className={cn(
-              "px-3 py-1.5 text-sm font-medium rounded-md transition",
-              basis === b ? "bg-[var(--brand)] text-white" : "text-[var(--muted)] hover:text-[var(--foreground)]"
+              "relative z-10 w-[120px] rounded-md px-3 py-1.5 transition-colors",
+              basis === b ? "text-[var(--primary-foreground)]" : "text-[var(--muted)] hover:text-[var(--foreground)]"
             )}
           >
             {b === "SALES" ? "Sales-based" : "Demand-plan"}
@@ -28,7 +33,7 @@ export function CoverageCards({ sales, demand }: { sales: CoverageView; demand: 
 
       {/* the flow */}
       <div className="flex flex-wrap items-stretch gap-2 mb-4">
-        <Flow label="Initial 70%+ stock" value={`${fmtInt(view.initialAbove70Cases)}`} unit="cases" />
+        <Flow label="Initial 70%+ stock" value={fmtInt(view.initialAbove70Cases)} unit="cases" />
         <Op>−</Op>
         <Flow label="Ages below 70% first" value={fmtInt(view.transitionedCases)} unit="cases" tone="warn" />
         <Op>=</Op>
@@ -38,11 +43,12 @@ export function CoverageCards({ sales, demand }: { sales: CoverageView; demand: 
         <Op>=</Op>
         <Flow label="Coverage" value={fmtDays(view.effectiveCoverageDays)} unit="days" tone="brand" />
       </div>
-      <p className="text-sm text-[var(--muted)] mb-4">
+      <p className="text-[13px] text-[var(--muted)] mb-4 leading-relaxed">
         Estimated 70%+ stock runs out around{" "}
-        <span className="font-semibold text-[var(--foreground)]">{fmtDate(view.coverageEndDate)}</span>{" "}
-        (JWL only, FEFO consumption). Naïve “inventory ÷ DRR” would overstate this by counting the{" "}
-        {fmtInt(view.transitionedCases)} cases that age below 70% before they can be sold.
+        <span className="font-semibold text-[var(--foreground)]">{fmtDate(view.coverageEndDate)}</span> (JWL only, FEFO
+        consumption). A naïve “inventory ÷ DRR” would overstate this by counting the{" "}
+        <span className="tabnum font-medium text-[var(--warn)]">{fmtInt(view.transitionedCases)}</span> cases that age below
+        70% before they can be sold.
       </p>
 
       <PerSkuTable view={view} />
@@ -62,19 +68,19 @@ function Flow({
   tone?: "good" | "warn" | "brand";
 }) {
   const color =
-    tone === "good" ? "var(--good)" : tone === "warn" ? "var(--warn)" : tone === "brand" ? "var(--brand)" : "var(--foreground)";
+    tone === "good" ? "var(--good)" : tone === "warn" ? "var(--warn)" : tone === "brand" ? "var(--primary)" : "var(--foreground)";
   return (
-    <div className="flex-1 min-w-[130px] rounded-lg border border-[var(--border)] bg-white px-3 py-2">
-      <div className="text-[11px] uppercase tracking-wide text-[var(--muted)]">{label}</div>
-      <div className="mt-0.5 text-lg font-bold tabular-nums" style={{ color }}>
-        {value} <span className="text-xs font-normal text-[var(--muted)]">{unit}</span>
+    <div className="flex-1 min-w-[128px] rounded-xl border border-[var(--hairline)] bg-[var(--hover)] px-3 py-2.5">
+      <div className="eyebrow">{label}</div>
+      <div className="mt-1 text-[18px] font-bold leading-none tabnum" style={{ color }}>
+        {value} <span className="text-[11px] font-normal text-[var(--muted)]">{unit}</span>
       </div>
     </div>
   );
 }
 
 function Op({ children }: { children: React.ReactNode }) {
-  return <div className="flex items-center text-lg font-bold text-[var(--muted)] px-0.5">{children}</div>;
+  return <div className="flex items-center px-0.5 text-[16px] font-bold text-[var(--muted)]">{children}</div>;
 }
 
 function PerSkuTable({ view }: { view: CoverageView }) {
@@ -85,18 +91,20 @@ function PerSkuTable({ view }: { view: CoverageView }) {
     setOpen(n);
   };
 
+  const th = "px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)] border-b border-[var(--border)]";
+
   return (
-    <div className="scroll-x">
-      <table className="w-full min-w-[820px] border-collapse text-sm">
+    <div className="scroll-x rounded-xl border border-[var(--hairline)]">
+      <table className="w-full min-w-[820px] border-collapse text-[12.5px]">
         <thead>
-          <tr className="border-b border-[var(--border)] text-[var(--muted)]">
-            <th className="px-2.5 py-2 text-left font-semibold">SKU</th>
-            <th className="px-2.5 py-2 text-right font-semibold">DRR</th>
-            <th className="px-2.5 py-2 text-right font-semibold">Initial 70%+</th>
-            <th className="px-2.5 py-2 text-right font-semibold">Effective usable</th>
-            <th className="px-2.5 py-2 text-right font-semibold">Ages out</th>
-            <th className="px-2.5 py-2 text-right font-semibold">Coverage days</th>
-            <th className="px-2.5 py-2 text-left font-semibold">Runs out</th>
+          <tr className="bg-[var(--card)]">
+            <th className={th + " text-left"}>SKU</th>
+            <th className={th + " text-right"}>DRR</th>
+            <th className={th + " text-right"}>Initial 70%+</th>
+            <th className={th + " text-right"}>Effective usable</th>
+            <th className={th + " text-right"}>Ages out</th>
+            <th className={th + " text-right"}>Coverage days</th>
+            <th className={th + " text-left"}>Runs out</th>
           </tr>
         </thead>
         <tbody>
@@ -106,31 +114,31 @@ function PerSkuTable({ view }: { view: CoverageView }) {
             return (
               <Fragment key={s.sku}>
                 <tr
-                  className="border-b border-[var(--border)] hover:bg-black/[0.02] cursor-pointer"
+                  className="border-b border-[var(--hairline)] hover:bg-[var(--hover)] cursor-pointer transition-colors"
                   onClick={() => toggle(s.sku)}
                 >
-                  <td className="px-2.5 py-2 font-medium whitespace-nowrap">
-                    <span className="inline-block w-4 text-[var(--muted)]">{isOpen ? "▾" : "▸"}</span>
+                  <td className="whitespace-nowrap px-3 py-2.5 font-medium">
+                    <span className="mr-1 inline-block w-3 text-[var(--muted)]">{isOpen ? "▾" : "▸"}</span>
                     {s.sku}
                   </td>
-                  <td className="px-2.5 py-2 text-right tabular-nums">{fmtNum(s.drr)}</td>
-                  <td className="px-2.5 py-2 text-right tabular-nums">{fmtInt(s.initialAbove70Cases)}</td>
-                  <td className="px-2.5 py-2 text-right tabular-nums" style={{ color: "var(--good)" }}>
+                  <td className="px-3 py-2.5 text-right tabnum">{fmtNum(s.drr)}</td>
+                  <td className="px-3 py-2.5 text-right tabnum">{fmtInt(s.initialAbove70Cases)}</td>
+                  <td className="px-3 py-2.5 text-right tabnum" style={{ color: "var(--good)" }}>
                     {fmtInt(s.consumedAbove70Cases)}
                   </td>
-                  <td className="px-2.5 py-2 text-right tabular-nums" style={{ color: s.transitionedCases > 0 ? "var(--warn)" : undefined }}>
+                  <td className="px-3 py-2.5 text-right tabnum" style={{ color: s.transitionedCases > 0 ? "var(--warn)" : undefined }}>
                     {fmtInt(s.transitionedCases)}
                   </td>
-                  <td className="px-2.5 py-2 text-right tabular-nums font-semibold">{fmtDays(s.effectiveCoverageDays)}</td>
-                  <td className="px-2.5 py-2 whitespace-nowrap">{fmtDate(s.coverageEndDate)}</td>
+                  <td className="px-3 py-2.5 text-right tabnum font-semibold">{fmtDays(s.effectiveCoverageDays)}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 tabnum">{fmtDate(s.coverageEndDate)}</td>
                 </tr>
                 {isOpen && (
-                  <tr className="bg-black/[0.015]">
+                  <tr className="bg-[var(--hover)]">
                     <td colSpan={7} className="px-4 py-3">
                       {activeBatches.length === 0 ? (
-                        <div className="text-xs text-[var(--muted)]">No 70%+ batches for this SKU at JWL.</div>
+                        <div className="text-[11px] text-[var(--muted)]">No 70%+ batches for this SKU at JWL.</div>
                       ) : (
-                        <table className="w-full text-xs">
+                        <table className="w-full text-[11.5px]">
                           <thead>
                             <tr className="text-[var(--muted)]">
                               <th className="px-2 py-1 text-left font-medium">FEFO #</th>
@@ -147,14 +155,14 @@ function PerSkuTable({ view }: { view: CoverageView }) {
                             {activeBatches
                               .sort((a, b) => (a.fefoPriority ?? 99) - (b.fefoPriority ?? 99))
                               .map((b, i) => (
-                                <tr key={i} className="border-t border-[var(--border)]">
-                                  <td className="px-2 py-1">{b.fefoPriority ?? "—"}</td>
+                                <tr key={i} className="border-t border-[var(--hairline)]">
+                                  <td className="px-2 py-1 tabnum">{b.fefoPriority ?? "—"}</td>
                                   <td className="px-2 py-1">{b.batchNo || "—"}</td>
-                                  <td className="px-2 py-1">{fmtDate(b.mfd)}</td>
-                                  <td className="px-2 py-1">{fmtDate(b.date70)}</td>
-                                  <td className="px-2 py-1 text-right tabular-nums">{fmtInt(b.initialCases)}</td>
-                                  <td className="px-2 py-1 text-right tabular-nums" style={{ color: "var(--good)" }}>{fmtInt(b.consumedAbove70)}</td>
-                                  <td className="px-2 py-1 text-right tabular-nums" style={{ color: b.transitionedBelow70 > 0 ? "var(--warn)" : undefined }}>{fmtInt(b.transitionedBelow70)}</td>
+                                  <td className="px-2 py-1 tabnum">{fmtDate(b.mfd)}</td>
+                                  <td className="px-2 py-1 tabnum">{fmtDate(b.date70)}</td>
+                                  <td className="px-2 py-1 text-right tabnum">{fmtInt(b.initialCases)}</td>
+                                  <td className="px-2 py-1 text-right tabnum" style={{ color: "var(--good)" }}>{fmtInt(b.consumedAbove70)}</td>
+                                  <td className="px-2 py-1 text-right tabnum" style={{ color: b.transitionedBelow70 > 0 ? "var(--warn)" : undefined }}>{fmtInt(b.transitionedBelow70)}</td>
                                   <td className="px-2 py-1">{COVERAGE_STATUS_LABEL[b.status] ?? b.status}</td>
                                 </tr>
                               ))}
