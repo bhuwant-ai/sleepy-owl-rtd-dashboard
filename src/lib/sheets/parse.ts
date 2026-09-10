@@ -112,7 +112,7 @@ export function parseInventoryTab(
     }
     if (f.remainingDays) {
       const rem = numOrNull(row[f.remainingDays]);
-      if (rem != null && rem < 0) {
+      if (rem != null && rem <= 0) {
         expiredCount++;
         continue;
       }
@@ -177,8 +177,8 @@ export function parseInventoryTab(
   if (expiredCount > 0) {
     issues.push({
       severity: "info",
-      code: "EXCLUDED_NEGATIVE_SHELF_LIFE",
-      message: `Excluded ${expiredCount} expired batch${expiredCount === 1 ? "" : "es"} (negative shelf life).`,
+      code: "EXCLUDED_EXPIRED",
+      message: `Excluded ${expiredCount} expired batch${expiredCount === 1 ? "" : "es"} (0% or negative shelf life).`,
       context: source,
     });
   }

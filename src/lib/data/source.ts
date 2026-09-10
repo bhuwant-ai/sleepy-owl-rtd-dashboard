@@ -30,6 +30,8 @@ export const JWL_FIELDS: InventoryTabFields = {
   boxes: "Closing Inventory No. Of boxes",
   location: "Location",
   name: "Description",
+  // Drop expired (0% or negative shelf life) JWL rack stock.
+  remainingDays: "Remaining (days)",
 };
 
 export const LOW_SHELF_FIELDS: InventoryTabFields = {
