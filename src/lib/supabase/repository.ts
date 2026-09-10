@@ -38,13 +38,13 @@ export async function upsertSkuMaster(): Promise<void> {
 export async function replaceAll(raw: DashboardInput): Promise<{ batchRows: number }> {
   const sb = getSupabaseAdmin();
 
-  // Clear existing snapshot rows.
-  const del1 = await sb.from("inventory_batches").delete().gt("id", -1);
-  if (del1.error) throw new Error(`clear inventory_batches: ${del1.error.message}`);
-  const del2 = await sb.from("sales_mtd").delete().neq("sku", "__none__");
-  if (del2.error) throw new Error(`clear sales_mtd: ${del2.error.message}`);
-  const del3 = await sb.from("demand_plan").delete().neq("sku", "__none__");
-  if (del3.error) throw new Error(`clear demand_plan: ${del3.error.message}`);
+  // Clear existing snapshot rows. We filter on `sku` (a column present in all
+  // three tables and always non-empty) which reliably matches every row — an
+  // earlier numeric-id filter silently matched nothing and caused duplicates.
+  for (const table of ["inventory_batches", "sales_mtd", "demand_plan"]) {
+    const del = await sb.from(table).delete().neq("sku", "__none__");
+    if (del.error) throw new Error(`clear ${table}: ${del.error.message}`);
+  }
 
   const batchRows = raw.batches.map((b) => ({
     sku: b.sku,
