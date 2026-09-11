@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   Warehouse,
@@ -12,6 +12,8 @@ import {
   RotateCcw,
   Sun,
   Moon,
+  Ban,
+  CalendarX,
 } from "lucide-react";
 import type { DashboardData, CoverageView } from "@/lib/calc/dashboard";
 import type { Category } from "@/lib/types";
@@ -194,6 +196,33 @@ export function Dashboard({ data }: { data: DashboardData }) {
               </div>
             ))}
           </div>
+
+          {(data.excluded.nonSellable.batches > 0 || data.excluded.expired.batches > 0) && (
+            <Card className="mt-3 p-4 anim-in">
+              <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+                <div>
+                  <div className="eyebrow">Excluded from JWL totals</div>
+                  <div className="text-[11px] text-[var(--muted)]">
+                    Set aside per the non-sellable &amp; expiry rules — not counted in the figures above (all RTD)
+                  </div>
+                </div>
+                <ExcludedStat
+                  icon={<Ban className="h-4 w-4" />}
+                  label="Non-sellable"
+                  cases={data.excluded.nonSellable.cases}
+                  batches={data.excluded.nonSellable.batches}
+                  color="var(--bad)"
+                />
+                <ExcludedStat
+                  icon={<CalendarX className="h-4 w-4" />}
+                  label="Expired / 0% shelf life"
+                  cases={data.excluded.expired.cases}
+                  batches={data.excluded.expired.batches}
+                  color="var(--warn)"
+                />
+              </div>
+            </Card>
+          )}
         </section>
 
         {/* Section 2 — shelf-life split + coverage */}
@@ -297,4 +326,36 @@ function recomputeCoverage(view: CoverageView, allowed: Set<string>, todayIso: s
     effectiveCoverageDays: days != null ? round1(days) : null,
     coverageEndDate: days != null ? addDaysIso(todayIso, Math.floor(days)) : null,
   };
+}
+
+function ExcludedStat({
+  icon,
+  label,
+  cases,
+  batches,
+  color,
+}: {
+  icon: ReactNode;
+  label: string;
+  cases: number;
+  batches: number;
+  color: string;
+}) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span
+        className="grid h-9 w-9 place-items-center rounded-lg"
+        style={{ background: `color-mix(in oklab, ${color} 14%, transparent)`, color }}
+      >
+        {icon}
+      </span>
+      <div>
+        <div className="eyebrow">{label}</div>
+        <div className="text-[18px] font-bold leading-none tabnum" style={{ color }}>
+          {fmtInt(cases)} <span className="text-[11px] font-normal text-[var(--muted)]">cases</span>
+        </div>
+        <div className="text-[10px] text-[var(--muted)] tabnum">{fmtInt(batches)} batches</div>
+      </div>
+    </div>
+  );
 }

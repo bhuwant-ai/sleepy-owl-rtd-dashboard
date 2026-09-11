@@ -124,6 +124,11 @@ export interface DashboardData {
   month: { label: string; elapsedDays: number; daysInMonth: number };
   config: { thresholdPct: number; coverageScope: "JWL only" };
   kpis: Kpis;
+  /** Stock set aside and NOT included in JWL totals (shown separately). */
+  excluded: {
+    nonSellable: { cases: number; batches: number };
+    expired: { cases: number; batches: number };
+  };
   categories: CategoryRow[];
   skus: SkuRow[];
   batches: BatchRow[];
@@ -353,12 +358,26 @@ export function computeDashboard(input: DashboardInput, today: Date): DashboardD
     };
   };
 
+  // Totals of stock set aside (summed across all source tabs).
+  const sumExcluded = (code: string) =>
+    issues
+      .filter((i) => i.code === code)
+      .reduce(
+        (a, i) => ({ cases: a.cases + (i.cases ?? 0), batches: a.batches + (i.count ?? 0) }),
+        { cases: 0, batches: 0 }
+      );
+  const excluded = {
+    nonSellable: sumExcluded("EXCLUDED_NON_SELLABLE"),
+    expired: sumExcluded("EXCLUDED_EXPIRED"),
+  };
+
   return {
     generatedAt: new Date().toISOString(),
     today: isoDate(today)!,
     month: { label: month.monthLabel, elapsedDays: month.elapsedDays, daysInMonth: month.daysInMonth },
     config: { thresholdPct: 70, coverageScope: "JWL only" },
     kpis,
+    excluded,
     categories,
     skus,
     batches,

@@ -39,6 +39,9 @@ export interface DataQualityIssue {
   code: string;
   message: string;
   context?: string;
+  /** Optional structured figures (e.g. for exclusion summaries). */
+  cases?: number;
+  count?: number;
 }
 
 export interface ParseResult<T> {

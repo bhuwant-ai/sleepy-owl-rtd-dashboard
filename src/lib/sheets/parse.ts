@@ -69,7 +69,9 @@ export function parseInventoryTab(
   const issues: DataQualityIssue[] = [];
   const out: InventoryBatch[] = [];
   let nonSellableCount = 0;
+  let nonSellableCases = 0;
   let expiredCount = 0;
+  let expiredCases = 0;
 
   for (const row of objects(csv)) {
     const rawSku = (row[f.sku] || "").trim();
@@ -101,12 +103,16 @@ export function parseInventoryTab(
       continue;
     }
 
-    // Business rule (Low Shelf Life tab): ignore inventory that is flagged
-    // "Non Sellable" or that already has negative (expired) shelf life.
+    const cases = num(row[f.boxes]);
+
+    // Business rule: set aside stock flagged "Non Sellable" or already expired
+    // (0% / negative remaining shelf life). We track the excluded case
+    // quantities so they can be reported separately on the dashboard.
     if (f.remarks) {
       const remark = (row[f.remarks] || "").trim().toLowerCase();
       if (remark === "non sellable" || remark === "non-sellable") {
         nonSellableCount++;
+        nonSellableCases += Math.max(0, cases);
         continue;
       }
     }
@@ -114,11 +120,11 @@ export function parseInventoryTab(
       const rem = numOrNull(row[f.remainingDays]);
       if (rem != null && rem <= 0) {
         expiredCount++;
+        expiredCases += Math.max(0, cases);
         continue;
       }
     }
 
-    const cases = num(row[f.boxes]);
     if (cases < 0) {
       issues.push({
         severity: "warning",
@@ -170,16 +176,20 @@ export function parseInventoryTab(
     issues.push({
       severity: "info",
       code: "EXCLUDED_NON_SELLABLE",
-      message: `Excluded ${nonSellableCount} non-sellable batch${nonSellableCount === 1 ? "" : "es"}.`,
+      message: `Excluded ${nonSellableCount} non-sellable batch${nonSellableCount === 1 ? "" : "es"} (${nonSellableCases} cases).`,
       context: source,
+      cases: nonSellableCases,
+      count: nonSellableCount,
     });
   }
   if (expiredCount > 0) {
     issues.push({
       severity: "info",
       code: "EXCLUDED_EXPIRED",
-      message: `Excluded ${expiredCount} expired batch${expiredCount === 1 ? "" : "es"} (0% or negative shelf life).`,
+      message: `Excluded ${expiredCount} expired batch${expiredCount === 1 ? "" : "es"} (0% or negative shelf life; ${expiredCases} cases).`,
       context: source,
+      cases: expiredCases,
+      count: expiredCount,
     });
   }
   return { data: out, issues };
