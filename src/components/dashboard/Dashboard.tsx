@@ -23,6 +23,7 @@ import { ShelfChart } from "./ShelfChart";
 import { SkuTable } from "./SkuTable";
 import { BatchTable } from "./BatchTable";
 import { CoverageCards } from "./CoverageCards";
+import { SupplyTable } from "./SupplyTable";
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
@@ -246,6 +247,16 @@ export function Dashboard({ data }: { data: DashboardData }) {
         <div className="anim-in" style={{ animationDelay: "0.2s" }}>
           <SectionCard title="SKU inventory & metrics" subtitle="JWL by shelf-life bucket, vendor, sales, demand, DRR and DOH">
             <SkuTable rows={filteredSkus} />
+          </SectionCard>
+        </div>
+
+        {/* Section 3b — SKU supply & stock-out plan (incl. vendor) */}
+        <div className="anim-in" style={{ animationDelay: "0.22s" }}>
+          <SectionCard
+            title="Supply & stock-out plan (incl. vendor)"
+            subtitle="Per-SKU warehouse + vendor stock, 70%+ coverage including vendor, projected next-month opening and stock-out date"
+          >
+            <SupplyTable rows={filteredSkus} batches={batchesFiltered} today={data.today} />
           </SectionCard>
         </div>
 
