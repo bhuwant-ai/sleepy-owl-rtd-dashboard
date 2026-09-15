@@ -1,9 +1,11 @@
 /**
- * Parsers that turn raw sheet CSV text into clean, SKU-mapped domain objects.
+ * Parsers that turn raw sheet rows (arrays of cells) into clean, SKU-mapped
+ * domain objects.
  *
- * These functions are PURE (CSV string in, data + issues out) so they can be
- * unit-tested against saved snapshots without any network access. The network
- * fetching lives separately in ./client.ts.
+ * Input is an array-of-arrays (from the xlsx reader) rather than a fixed CSV
+ * layout, and columns are located by TOLERANT matching on the header row. This
+ * makes parsing robust to filters (all rows are present), two-row headers, and
+ * header renames (e.g. "Closing Inventory No. Of boxes" vs "No. Of boxes").
  */
 import Papa from "papaparse";
 import { parseSheetDate } from "../calc/dates";
@@ -20,51 +22,49 @@ import type {
 import { SKU_MASTER } from "../constants";
 
 // ---------- small helpers -------------------------------------------------
-function rows(csv: string): string[][] {
-  return Papa.parse<string[]>(csv, { skipEmptyLines: false }).data.filter(Boolean);
+/** Convert CSV text to an array-of-arrays (used by tests / snapshots). */
+export function csvToRows(csv: string): string[][] {
+  return Papa.parse<string[]>(csv, { skipEmptyLines: false }).data.filter((r): r is string[] =>
+    Array.isArray(r)
+  );
 }
-function objects(csv: string): Record<string, string>[] {
-  return Papa.parse<Record<string, string>>(csv, {
-    header: true,
-    skipEmptyLines: true,
-  }).data;
-}
-/** Parse a number that may contain commas/spaces. Blank -> 0. */
-function num(v: string | undefined | null): number {
+/** Parse a number that may contain commas/spaces/%. Blank -> 0. */
+function num(v: unknown): number {
   if (v == null) return 0;
-  const cleaned = String(v).replace(/[, ]/g, "").trim();
+  const cleaned = String(v).replace(/[,%\s]/g, "");
   if (!cleaned) return 0;
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : 0;
 }
-function numOrNull(v: string | undefined | null): number | null {
+function numOrNull(v: unknown): number | null {
   if (v == null || String(v).trim() === "") return null;
   const n = num(v);
   return Number.isFinite(n) ? n : null;
 }
+const cell = (row: string[], i: number): string => (i >= 0 && row[i] != null ? String(row[i]) : "");
 
-// ---------- inventory tabs (JWL Racks, Low Shelf Life) --------------------
-export interface InventoryTabFields {
-  sku: string;
-  category: string;
-  mfd: string;
-  exp: string;
-  batchNo: string;
-  shelf: string;
-  boxes: string; // closing / available boxes (= cases)
-  location: string;
-  name: string;
-  /** Optional: column that flags stock as "Non Sellable" (Low Shelf Life tab). */
-  remarks?: string;
-  /** Optional: remaining-shelf-life-days column, used to drop expired stock. */
-  remainingDays?: string;
+/** First column whose (trimmed) header matches any of the patterns; -1 if none. */
+function findCol(header: string[], ...patterns: RegExp[]): number {
+  for (const p of patterns) {
+    const i = header.findIndex((h) => p.test(h.trim()));
+    if (i >= 0) return i;
+  }
+  return -1;
+}
+/** Index of the first row (within the first 40) that looks like a header. */
+function findHeaderRow(aoa: string[][], required: RegExp[]): number {
+  for (let i = 0; i < Math.min(aoa.length, 40); i++) {
+    const cells = aoa[i].map((x) => String(x).trim());
+    if (required.every((p) => cells.some((c) => p.test(c)))) return i;
+  }
+  return -1;
 }
 
+// ---------- inventory tabs (JWL Racks, Low Shelf Life) --------------------
 export function parseInventoryTab(
-  csv: string,
+  aoa: string[][],
   source: InventorySource,
-  locationType: LocationType,
-  f: InventoryTabFields
+  locationType: LocationType
 ): ParseResult<InventoryBatch[]> {
   const issues: DataQualityIssue[] = [];
   const out: InventoryBatch[] = [];
@@ -73,17 +73,49 @@ export function parseInventoryTab(
   let expiredCount = 0;
   let expiredCases = 0;
 
-  for (const row of objects(csv)) {
-    const rawSku = (row[f.sku] || "").trim();
+  const hi = findHeaderRow(aoa, [/^sku/i]);
+  if (hi < 0) {
+    issues.push({
+      severity: "error",
+      code: "HEADER_NOT_FOUND",
+      message: `Could not find a header row with an SKU column in ${source}.`,
+      context: source,
+    });
+    return { data: out, issues };
+  }
+  const H = aoa[hi].map((c) => c.trim());
+  const col = {
+    sku: findCol(H, /^sku$/i, /^sku codes?$/i, /^product code$/i, /^sku/i),
+    cat: findCol(H, /^categories$/i, /categor/i),
+    mfd: findCol(H, /^mfd$/i, /^mfg/i, /manufactur/i),
+    exp: findCol(H, /^exp$/i, /^expiry/i, /^exp/i),
+    batch: findCol(H, /^batch\s*no/i, /batch/i),
+    shelf: findCol(H, /total shelf life/i),
+    rem: findCol(H, /^remaining/i),
+    loc: findCol(H, /^location$/i, /location/i),
+    remarks: findCol(H, /^remarks$/i, /remark/i),
+  };
+  // Current available/closing stock in cases. Prefer explicit "available/
+  // closing" columns; otherwise the boxes column that comes AFTER Location
+  // (the closing count, vs the opening count that comes before it).
+  let boxCol = findCol(H, /total boxes avl/i, /closing.*box/i, /available.*box/i);
+  if (boxCol < 0 && col.loc >= 0) {
+    for (let i = col.loc + 1; i < H.length; i++) {
+      if (/box/i.test(H[i])) {
+        boxCol = i;
+        break;
+      }
+    }
+  }
+  if (boxCol < 0) boxCol = findCol(H, /no\.?\s*of\s*boxes/i);
+
+  for (const row of aoa.slice(hi + 1)) {
+    const rawSku = cell(row, col.sku).trim();
     if (!rawSku) continue;
 
-    // Include a row when its SKU maps to a tracked product. This is robust to
-    // a blank/"#N/A" category cell. We only look at the category column to
-    // decide whether an UNMAPPED code is worth warning about (i.e. it looked
-    // like an RTD row) versus silently skipping (a non-RTD row like Premix).
     const resolved = resolveSku(rawSku);
     if (!resolved) {
-      const cat = normalizeCategory(row[f.category]);
+      const cat = normalizeCategory(cell(row, col.cat));
       if (!cat) continue; // non-RTD row -> skip silently
       if (isExcludedMultipack(rawSku)) {
         issues.push({
@@ -103,22 +135,22 @@ export function parseInventoryTab(
       continue;
     }
 
-    const cases = num(row[f.boxes]);
+    const cases = num(cell(row, boxCol));
 
-    // Business rule: set aside stock flagged "Non Sellable" or already expired
-    // (0% / negative remaining shelf life). We track the excluded case
-    // quantities so they can be reported separately on the dashboard.
-    if (f.remarks) {
-      const remark = (row[f.remarks] || "").trim().toLowerCase();
+    // Business rule: set aside stock flagged "Non Sellable" (only tabs that
+    // have a Remarks column) or already expired (0% / negative remaining shelf
+    // life). Track the excluded case quantities for separate reporting.
+    if (col.remarks >= 0) {
+      const remark = cell(row, col.remarks).trim().toLowerCase();
       if (remark === "non sellable" || remark === "non-sellable") {
         nonSellableCount++;
         nonSellableCases += Math.max(0, cases);
         continue;
       }
     }
-    if (f.remainingDays) {
-      const rem = numOrNull(row[f.remainingDays]);
-      if (rem != null && rem <= 0) {
+    if (col.rem >= 0) {
+      const rd = numOrNull(cell(row, col.rem));
+      if (rd != null && rd <= 0) {
         expiredCount++;
         expiredCases += Math.max(0, cases);
         continue;
@@ -129,20 +161,20 @@ export function parseInventoryTab(
       issues.push({
         severity: "warning",
         code: "NEGATIVE_INVENTORY",
-        message: `Negative stock for ${resolved.sku} at ${row[f.location] || "?"}`,
+        message: `Negative stock for ${resolved.sku} at ${cell(row, col.loc) || "?"}`,
         context: source,
       });
       continue;
     }
     if (cases === 0) continue; // no current stock in this batch/location
 
-    const mfd = parseSheetDate(row[f.mfd]);
-    const exp = parseSheetDate(row[f.exp]);
+    const mfd = parseSheetDate(cell(row, col.mfd));
+    const exp = parseSheetDate(cell(row, col.exp));
     if (!mfd) {
       issues.push({
         severity: "warning",
         code: "MISSING_MFD",
-        message: `Missing/invalid manufacturing date for ${resolved.sku} (batch ${row[f.batchNo] || "?"}) — excluded from shelf-life & coverage.`,
+        message: `Missing/invalid manufacturing date for ${resolved.sku} (batch ${cell(row, col.batch) || "?"}) — excluded from shelf-life & coverage.`,
         context: source,
       });
     }
@@ -150,7 +182,7 @@ export function parseInventoryTab(
       issues.push({
         severity: "warning",
         code: "MISSING_EXP",
-        message: `Missing/invalid expiry date for ${resolved.sku} (batch ${row[f.batchNo] || "?"}).`,
+        message: `Missing/invalid expiry date for ${resolved.sku} (batch ${cell(row, col.batch) || "?"}).`,
         context: source,
       });
     }
@@ -162,11 +194,11 @@ export function parseInventoryTab(
       category: resolved.category,
       locationType,
       source,
-      location: (row[f.location] || "").trim(),
-      batchNo: (row[f.batchNo] || "").trim(),
+      location: cell(row, col.loc).trim(),
+      batchNo: cell(row, col.batch).trim(),
       mfd,
       exp,
-      totalShelfLifeDays: numOrNull(row[f.shelf]),
+      totalShelfLifeDays: numOrNull(cell(row, col.shelf)),
       cases,
     });
   }
@@ -196,25 +228,32 @@ export function parseInventoryTab(
 }
 
 // ---------- vendor (RTD at Lotus) — wide format, up to 2 batches / SKU ----
-export function parseVendorLotus(csv: string): ParseResult<InventoryBatch[]> {
+export function parseVendorLotus(aoa: string[][]): ParseResult<InventoryBatch[]> {
   const issues: DataQualityIssue[] = [];
   const out: InventoryBatch[] = [];
-  const all = rows(csv);
 
-  // Column layout (0-indexed), from the sheet header:
-  // 0 Total Stock | 1 SKU | 2 Name | 3 Aug Prod | 4 MFG | 5 Exp | 6 70%Hit
-  //   | 7 Batch2 Qty | 8 MFG | 9 Exp | 10 70%Hit
-  for (let i = 1; i < all.length; i++) {
-    const r = all[i];
-    const rawSku = (r[1] || "").trim();
+  const hi = findHeaderRow(aoa, [/^sku$/i]);
+  const headerRow = hi >= 0 ? hi : 0;
+  const H = (aoa[headerRow] || []).map((c) => c.trim());
+  const s = findCol(H, /^sku$/i, /^sku/i);
+  if (s < 0) {
+    issues.push({ severity: "error", code: "HEADER_NOT_FOUND", message: "No SKU column in RTD at Lotus.", context: "VENDOR_LOTUS" });
+    return { data: out, issues };
+  }
+  // Column offsets relative to the SKU column (matches the Lotus layout:
+  // Total | SKU | Name | AugQty | MFG | Exp | 70%Hit | Batch2Qty | MFG | Exp | 70%Hit)
+  const O = { total: s - 1, q1: s + 2, mfg1: s + 3, exp1: s + 4, q2: s + 6, mfg2: s + 7, exp2: s + 8 };
+
+  for (const r of aoa.slice(headerRow + 1)) {
+    const rawSku = cell(r, s).trim();
     if (!rawSku) continue;
     const resolved = resolveSku(rawSku);
     if (!resolved) continue;
 
-    const total = num(r[0]);
-    const pieces: { cases: number; mfd: Date | null; exp: Date | null; tag: string }[] = [
-      { cases: num(r[3]), mfd: parseSheetDate(r[4]), exp: parseSheetDate(r[5]), tag: "B1" },
-      { cases: num(r[7]), mfd: parseSheetDate(r[8]), exp: parseSheetDate(r[9]), tag: "B2" },
+    const total = num(cell(r, O.total));
+    const pieces = [
+      { cases: num(cell(r, O.q1)), mfd: parseSheetDate(cell(r, O.mfg1)), exp: parseSheetDate(cell(r, O.exp1)), tag: "B1" },
+      { cases: num(cell(r, O.q2)), mfd: parseSheetDate(cell(r, O.mfg2)), exp: parseSheetDate(cell(r, O.exp2)), tag: "B2" },
     ];
 
     let added = 0;
@@ -237,8 +276,6 @@ export function parseVendorLotus(csv: string): ParseResult<InventoryBatch[]> {
       });
     }
 
-    // If the sheet shows a total but no per-batch breakdown, keep the total
-    // as a single dateless batch so it is not lost.
     if (added === 0 && total > 0) {
       out.push({
         sku: resolved.sku,
@@ -273,11 +310,18 @@ export function parseVendorLotus(csv: string): ParseResult<InventoryBatch[]> {
 }
 
 // ---------- MTD Sales -----------------------------------------------------
-export function parseSales(csv: string): ParseResult<SalesMtd[]> {
+export function parseSales(aoa: string[][]): ParseResult<SalesMtd[]> {
   const issues: DataQualityIssue[] = [];
   const bySku = new Map<string, number>();
-  for (const row of objects(csv)) {
-    const rawSku = (row["Product Code"] || "").trim();
+
+  const hi = findHeaderRow(aoa, [/product code|^sku/i]);
+  const headerRow = hi >= 0 ? hi : 0;
+  const H = (aoa[headerRow] || []).map((c) => c.trim());
+  const skuCol = findCol(H, /^product code$/i, /^sku$/i, /product|sku/i);
+  const mtdCol = findCol(H, /mtd/i, /sale/i);
+
+  for (const r of aoa.slice(headerRow + 1)) {
+    const rawSku = cell(r, skuCol).trim();
     if (!rawSku) continue;
     const resolved = resolveSku(rawSku);
     if (!resolved) {
@@ -291,7 +335,7 @@ export function parseSales(csv: string): ParseResult<SalesMtd[]> {
       }
       continue;
     }
-    const cases = num(row["MTD Sale in cases"]);
+    const cases = num(cell(r, mtdCol));
     bySku.set(resolved.sku, (bySku.get(resolved.sku) || 0) + cases);
   }
   const data = [...bySku.entries()].map(([sku, cases]) => ({ sku, cases }));
@@ -301,15 +345,15 @@ export function parseSales(csv: string): ParseResult<SalesMtd[]> {
 // ---------- Demand Plan (Sep'26 RTD DP) -----------------------------------
 // The tab has two stacked sections: cases first, then units (cases x pack
 // size). We take the FIRST occurrence of each tracked "-ONE" SKU, which is the
-// cases figure, from Column M (index 12).
-export function parseDemand(csv: string): ParseResult<DemandPlanEntry[]> {
+// cases figure, from Column C (SKU, index 2) / Column M (total cases, index 12).
+export function parseDemand(aoa: string[][]): ParseResult<DemandPlanEntry[]> {
   const issues: DataQualityIssue[] = [];
   const seen = new Map<string, DemandPlanEntry>();
   const COL_SKU = 2;
   const COL_TOTAL_CASES = 12;
 
-  for (const r of rows(csv)) {
-    const rawSku = (r[COL_SKU] || "").trim();
+  for (const r of aoa) {
+    const rawSku = cell(r, COL_SKU).trim();
     if (!rawSku) continue;
     const resolved = resolveSku(rawSku);
     if (!resolved) continue; // packs / untracked / RPC etc.
@@ -319,11 +363,10 @@ export function parseDemand(csv: string): ParseResult<DemandPlanEntry[]> {
       sku: resolved.sku,
       rootCode: resolved.root,
       category: resolved.category,
-      cases: num(r[COL_TOTAL_CASES]),
+      cases: num(cell(r, COL_TOTAL_CASES)),
     });
   }
 
-  // Flag any tracked SKU that has no demand line.
   for (const m of SKU_MASTER) {
     if (!seen.has(m.root)) {
       issues.push({

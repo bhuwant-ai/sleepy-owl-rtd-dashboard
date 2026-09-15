@@ -12,8 +12,7 @@
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { parseInventoryTab, parseVendorLotus, parseSales, parseDemand } from "../parse";
-import { JWL_FIELDS, LOW_SHELF_FIELDS } from "../../data/source";
+import { parseInventoryTab, parseVendorLotus, parseSales, parseDemand, csvToRows } from "../parse";
 import { computeDashboard } from "../../calc/dashboard";
 
 const DIR = process.env.SNAPSHOT_DIR;
@@ -30,11 +29,11 @@ const ready = !!DIR && Object.values(FILES).every((f) => existsSync(join(DIR!, f
 const read = (f: string) => (DIR ? readFileSync(join(DIR, f), "utf8") : "");
 
 (ready ? describe : describe.skip)("real-data snapshot validation", () => {
-  const jwl = parseInventoryTab(read(FILES.jwl), "JWL_RACKS", "JWL", JWL_FIELDS);
-  const low = parseInventoryTab(read(FILES.low), "LOW_SHELF_LIFE", "JWL", LOW_SHELF_FIELDS);
-  const lotus = parseVendorLotus(read(FILES.lotus));
-  const sales = parseSales(read(FILES.sales));
-  const demand = parseDemand(read(FILES.demand));
+  const jwl = parseInventoryTab(csvToRows(read(FILES.jwl)), "JWL_RACKS", "JWL");
+  const low = parseInventoryTab(csvToRows(read(FILES.low)), "LOW_SHELF_LIFE", "JWL");
+  const lotus = parseVendorLotus(csvToRows(read(FILES.lotus)));
+  const sales = parseSales(csvToRows(read(FILES.sales)));
+  const demand = parseDemand(csvToRows(read(FILES.demand)));
 
   const sum = (arr: { cases: number }[]) => arr.reduce((a, b) => a + b.cases, 0);
 

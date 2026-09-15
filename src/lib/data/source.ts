@@ -6,75 +6,38 @@
  * the sync writes this same shape into the database and this loader can read
  * from there instead (the compute layer is unchanged).
  */
-import { fetchTabCsv } from "../sheets/client";
-import {
-  parseInventoryTab,
-  parseVendorLotus,
-  parseSales,
-  parseDemand,
-  type InventoryTabFields,
-} from "../sheets/parse";
+import { loadWorkbook, sheetToRows } from "../sheets/client";
+import { parseInventoryTab, parseVendorLotus, parseSales, parseDemand } from "../sheets/parse";
 import { SHEETS, getToday } from "../constants";
 import { computeDashboard, type DashboardData, type DashboardInput } from "../calc/dashboard";
 import { isSupabaseConfigured } from "../supabase/client";
 import { loadRaw as loadRawFromDb } from "../supabase/repository";
 import type { DataQualityIssue } from "../types";
 
-export const JWL_FIELDS: InventoryTabFields = {
-  sku: "SKU",
-  category: "Categories",
-  mfd: "MFD",
-  exp: "EXP",
-  batchNo: "Batch No.",
-  shelf: "Total Shelf Life(Days)",
-  boxes: "Closing Inventory No. Of boxes",
-  location: "Location",
-  name: "Description",
-  // Drop expired (0% or negative shelf life) JWL rack stock.
-  remainingDays: "Remaining (days)",
-};
-
-export const LOW_SHELF_FIELDS: InventoryTabFields = {
-  sku: "SKU",
-  category: "Categories",
-  mfd: "MFD",
-  exp: "EXP",
-  batchNo: "Batch No",
-  shelf: "Total Shelf Life(Days)",
-  boxes: "Closing Inventory No. of Boxes",
-  location: "Location",
-  name: "Description",
-  remarks: "Remarks",
-  remainingDays: "Remaining (days)",
-};
-
-/** Fetch + parse every source tab into the combined dashboard input. */
+/**
+ * Fetch + parse every source tab into the combined dashboard input.
+ *
+ * Reads each spreadsheet as a full Excel export (all rows, filter-proof) and
+ * locates columns by tolerant header matching, so filters/sorts/header renames
+ * on the sheets don't break the dashboard.
+ */
 export async function loadRawFromSheets(): Promise<DashboardInput> {
-  const [jwlCsv, lowCsv, lotusCsv, salesCsv, demandCsv] = await Promise.all([
-    fetchTabCsv(SHEETS.inventory.id, SHEETS.inventory.tabs.jwlRacks),
-    fetchTabCsv(SHEETS.inventory.id, SHEETS.inventory.tabs.lowShelfLife),
-    fetchTabCsv(SHEETS.inventory.id, SHEETS.inventory.tabs.vendorLotus),
-    fetchTabCsv(SHEETS.inventory.id, SHEETS.inventory.tabs.mtdSales),
-    fetchTabCsv(SHEETS.demand.id, SHEETS.demand.tab),
+  const [invWb, demWb] = await Promise.all([
+    loadWorkbook(SHEETS.inventory.id),
+    loadWorkbook(SHEETS.demand.id),
   ]);
 
-  const jwl = parseInventoryTab(jwlCsv, "JWL_RACKS", "JWL", JWL_FIELDS);
-  const low = parseInventoryTab(lowCsv, "LOW_SHELF_LIFE", "JWL", LOW_SHELF_FIELDS);
-  const lotus = parseVendorLotus(lotusCsv);
-  const sales = parseSales(salesCsv);
-  const demand = parseDemand(demandCsv);
+  const jwl = parseInventoryTab(sheetToRows(invWb, SHEETS.inventory.tabs.jwlRacks), "JWL_RACKS", "JWL");
+  const low = parseInventoryTab(sheetToRows(invWb, SHEETS.inventory.tabs.lowShelfLife), "LOW_SHELF_LIFE", "JWL");
+  const lotus = parseVendorLotus(sheetToRows(invWb, SHEETS.inventory.tabs.vendorLotus));
+  const sales = parseSales(sheetToRows(invWb, SHEETS.inventory.tabs.mtdSales));
+  const demand = parseDemand(sheetToRows(demWb, SHEETS.demand.tab));
 
   return {
     batches: [...jwl.data, ...low.data, ...lotus.data],
     sales: sales.data,
     demand: demand.data,
-    issues: [
-      ...jwl.issues,
-      ...low.issues,
-      ...lotus.issues,
-      ...sales.issues,
-      ...demand.issues,
-    ],
+    issues: [...jwl.issues, ...low.issues, ...lotus.issues, ...sales.issues, ...demand.issues],
   };
 }
 

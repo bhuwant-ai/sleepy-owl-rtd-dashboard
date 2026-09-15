@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseInventoryTab } from "../parse";
-import { LOW_SHELF_FIELDS, JWL_FIELDS } from "../../data/source";
+import { parseInventoryTab, csvToRows } from "../parse";
 
 // A tiny Low Shelf Life sheet: one sellable batch, one "Non Sellable" batch,
 // one expired batch (negative remaining), and one at exactly 0% (boundary).
@@ -13,7 +12,7 @@ const LOW_CSV = [
 ].join("\n");
 
 describe("Low Shelf Life exclusions", () => {
-  const res = parseInventoryTab(LOW_CSV, "LOW_SHELF_LIFE", "JWL", LOW_SHELF_FIELDS);
+  const res = parseInventoryTab(csvToRows(LOW_CSV), "LOW_SHELF_LIFE", "JWL");
 
   it("keeps only the sellable, in-date batch", () => {
     expect(res.data.length).toBe(1);
@@ -30,19 +29,23 @@ describe("Low Shelf Life exclusions", () => {
   });
 });
 
-// JWL Racks has no Remarks column, but must still drop 0%/expired stock.
+// JWL Racks has no Remarks column, but must still drop 0%/expired stock, and
+// locate the CLOSING boxes column (the one after Location, not the opening one).
 const JWL_CSV = [
-  "Inward Date,SKU,Categories,MFD,EXP,Batch No.,Total Shelf Life(Days),Remaining (days),Shelf Life %,Closing Inventory No. Of boxes,Location,Description",
-  "Audit,CCC-HAZ-230-CAN-C24,RTD Can,05-Aug-2026,05-May-2027,H1,273,237,87%,50,A05,Hazelnut",
-  "Audit,CCC-VIE-230-CAN-C24,RTD Can,,,V1,,-46275,0%,120,A06,Vietnamese",
+  "Inward Date,SKU,Categories,MFD,EXP,Batch No.,Total Shelf Life(Days),No. of Boxes,Remaining (days),Shelf Life %,Location,No. Of boxes,Description",
+  "Audit,CCC-HAZ-230-CAN-C24,RTD Can,05-Aug-2026,05-May-2027,H1,273,120,237,87%,A05,50,Hazelnut",
+  "Audit,CCC-VIE-230-CAN-C24,RTD Can,,,V1,,120,-46275,0%,A06,120,Vietnamese",
 ].join("\n");
 
-describe("JWL Racks expired exclusion", () => {
-  const res = parseInventoryTab(JWL_CSV, "JWL_RACKS", "JWL", JWL_FIELDS);
+describe("JWL Racks expired exclusion + closing-column detection", () => {
+  const res = parseInventoryTab(csvToRows(JWL_CSV), "JWL_RACKS", "JWL");
 
-  it("keeps the in-date batch and drops the 0% batch", () => {
+  it("keeps the in-date batch with the CLOSING box count (50, not opening 120)", () => {
     expect(res.data.length).toBe(1);
     expect(res.data[0].sku).toBe("CCC-HAZ-230-CAN-C24");
+    expect(res.data[0].cases).toBe(50);
+  });
+  it("drops the 0% expired batch", () => {
     expect(res.issues.some((i) => i.code === "EXCLUDED_EXPIRED")).toBe(true);
   });
 });
