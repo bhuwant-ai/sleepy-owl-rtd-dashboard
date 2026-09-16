@@ -51,6 +51,10 @@ export interface SkuRow {
   demandDrr: number;
   salesDoh: number | null; // null = infinite (no run rate)
   demandDoh: number | null;
+  // Supply/stock-out planning (incl. vendor), sales-DRR FEFO simulation.
+  above70InclVendorCases: number; // JWL >70% + vendor >70% (eligible today)
+  stockoutInclVendorDate: string | null; // FEFO 70%+ coverage end date (JWL+vendor)
+  stockoutInclVendorDays: number | null;
 }
 
 export interface CategoryRow {
@@ -205,6 +209,19 @@ export function computeDashboard(input: DashboardInput, today: Date): DashboardD
     const dem = demandBySku.get(m.sku) ?? 0;
     const sDrr = salesDrr(mtd, month.elapsedDays);
     const dDrr = demandDrr(dem, month.daysInMonth);
+
+    // Stock-out incl. vendor: same FEFO 70%+ simulation as the coverage
+    // section, but over JWL + vendor batches, at the sales DRR.
+    const fefoInputs: FefoBatchInput[] = [...jwlB, ...vendB]
+      .filter((b) => b.mfd && b.date70 && b.totalDays)
+      .map((b, i) => ({
+        batchId: `${b.sku}|${b.source}|${i}`,
+        cases: b.cases,
+        expDate: b.exp ?? addDays(b.mfd!, b.totalDays!),
+        date70: b.date70!,
+      }));
+    const fefoInclVendor = simulateFefoCoverage(fefoInputs, sDrr, today);
+
     return {
       sku: m.sku,
       name: m.name,
@@ -220,6 +237,9 @@ export function computeDashboard(input: DashboardInput, today: Date): DashboardD
       demandDrr: round1(dDrr),
       salesDoh: finiteOrNull(round1(doh(jwlCases, sDrr))),
       demandDoh: finiteOrNull(round1(doh(jwlCases, dDrr))),
+      above70InclVendorCases: round1(fefoInclVendor.initialAbove70Cases),
+      stockoutInclVendorDate: isoDate(fefoInclVendor.coverageEndDate),
+      stockoutInclVendorDays: finiteOrNull(round1(fefoInclVendor.effectiveCoverageDays)),
     };
   });
 

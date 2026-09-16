@@ -1,6 +1,6 @@
 "use client";
 import type { SkuRow, BatchRow } from "@/lib/calc/dashboard";
-import { fmtInt, fmtNum, fmtDate, addDaysIso } from "@/lib/format";
+import { fmtInt, fmtNum, fmtDate } from "@/lib/format";
 
 /** First day of the month AFTER the given ISO date (ISO month is 1-based, and
  *  JS Date(y, m, 1) with that 1-based month lands on the next month's 1st). */
@@ -52,14 +52,14 @@ export function SupplyTable({ rows, batches, today }: { rows: SkuRow[]; batches:
               const vb = (vendorBySku.get(s.sku) || [])
                 .slice()
                 .sort((a, b) => (a.mfd || "").localeCompare(b.mfd || ""));
-              const vendorAbove70 = vb
-                .filter((x) => x.bucket === "ABOVE_70")
-                .reduce((a, x) => a + x.cases, 0);
-              const total70incl = s.above70Cases + vendorAbove70;
+              // 70%+ incl. vendor and the stock-out date come from the same
+              // FEFO 70%+ simulation as the coverage section (JWL + vendor,
+              // sales DRR) — accounts for batches ageing below 70% before sale.
+              const total70incl = s.above70InclVendorCases;
               const totalPhysical = s.jwlCases + s.vendorCases;
               const opening = Math.max(0, Math.round(totalPhysical - s.salesDrr * daysToNext));
-              const days = s.salesDrr > 0 ? total70incl / s.salesDrr : null;
-              const stockoutDate = days != null ? addDaysIso(today, Math.floor(days)) : null;
+              const stockoutDate = s.stockoutInclVendorDate;
+              const stockoutDays = s.stockoutInclVendorDays;
 
               return (
                 <tr key={s.sku} className="border-b border-[var(--hairline)] last:border-0 hover:bg-[var(--hover)] transition-colors align-top">
@@ -88,7 +88,9 @@ export function SupplyTable({ rows, batches, today }: { rows: SkuRow[]; batches:
                     {stockoutDate ? (
                       <>
                         <span className="tabnum">{fmtDate(stockoutDate)}</span>
-                        <span className="ml-1 text-[11px] text-[var(--muted)] tabnum">({Math.floor(days!)}d)</span>
+                        {stockoutDays != null && (
+                          <span className="ml-1 text-[11px] text-[var(--muted)] tabnum">({Math.floor(stockoutDays)}d)</span>
+                        )}
                       </>
                     ) : (
                       <span className="text-[var(--muted)]">— (no sales)</span>
@@ -112,7 +114,7 @@ export function SupplyTable({ rows, batches, today }: { rows: SkuRow[]; batches:
         <strong className="text-[var(--foreground)]">Vendor</strong> listed per manufacturing date (Lotus). ·{" "}
         <strong className="text-[var(--foreground)]">70%+ incl. vendor</strong> = JWL &gt;70% + vendor &gt;70%. ·{" "}
         <strong className="text-[var(--foreground)]">Proj. opening</strong> = (JWL + vendor) − Sales&nbsp;DRR × {daysToNext} days to {fmtDate(nextStart)}, floored at 0. ·{" "}
-        <strong className="text-[var(--foreground)]">Stock-out</strong> = today + (70%+ incl. vendor ÷ Sales&nbsp;DRR). All based on Sales DRR.
+        <strong className="text-[var(--foreground)]">Stock-out</strong> = the FEFO 70%+ coverage end date (same daily simulation as the coverage section, over JWL + vendor batches, at Sales&nbsp;DRR — accounts for batches dropping below 70% before they are sold).
       </p>
     </div>
   );
