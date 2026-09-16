@@ -24,6 +24,7 @@ import { SkuTable } from "./SkuTable";
 import { BatchTable } from "./BatchTable";
 import { CoverageCards } from "./CoverageCards";
 import { SupplyTable } from "./SupplyTable";
+import { ProductionPlanning } from "./ProductionPlanning";
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
@@ -257,6 +258,16 @@ export function Dashboard({ data }: { data: DashboardData }) {
             subtitle="Per-SKU warehouse + vendor stock, 70%+ coverage including vendor, projected next-month opening and stock-out date"
           >
             <SupplyTable rows={filteredSkus} batches={batchesFiltered} today={data.today} />
+          </SectionCard>
+        </div>
+
+        {/* Section 3c — Production planning (editable batches → prod plan) */}
+        <div className="anim-in" style={{ animationDelay: "0.24s" }}>
+          <SectionCard
+            title="Production planning"
+            subtitle="Demand vs available, current & next-month shortages, and an editable batch → production plan"
+          >
+            <ProductionPlanning rows={filteredSkus} today={data.today} />
           </SectionCard>
         </div>
 
