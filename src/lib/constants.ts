@@ -17,23 +17,24 @@ export interface SkuMasterEntry {
   name: string;
   category: Category;
   unitsPerCase: number;
+  casesPerBatch: number; // production batch size (cases) — used by Production planning
 }
 
 export const SKU_MASTER: SkuMasterEntry[] = [
   // ----- RTD Cans (24 units / case) -----
-  { root: "CCC-BEL-230-CAN", sku: "CCC-BEL-230-CAN-C24", name: "Cold Coffee Can Belgian Mocha 230ml", category: "RTD Cans", unitsPerCase: 24 },
-  { root: "CCC-BLK-230-CAN", sku: "CCC-BLK-230-CAN-C24", name: "Cold Brew Black Coffee Can 230ml", category: "RTD Cans", unitsPerCase: 24 },
-  { root: "CCC-CLA-230-CAN", sku: "CCC-CLA-230-CAN-C24", name: "Cold Coffee Can Classic 230ml", category: "RTD Cans", unitsPerCase: 24 },
-  { root: "CCC-FVA-230-CAN", sku: "CCC-FVA-230-CAN-C24", name: "Cold Coffee Can French Vanilla 230ml", category: "RTD Cans", unitsPerCase: 24 },
-  { root: "CCC-HAZ-230-CAN", sku: "CCC-HAZ-230-CAN-C24", name: "Cold Coffee Can Hazelnut 230ml", category: "RTD Cans", unitsPerCase: 24 },
-  { root: "CCC-LAT-230-CAN", sku: "CCC-LAT-230-CAN-C24", name: "Cold Coffee Can Caramel Latte 230ml", category: "RTD Cans", unitsPerCase: 24 },
-  { root: "CCC-VIE-230-CAN", sku: "CCC-VIE-230-CAN-C24", name: "Cold Coffee Can Vietnamese 230ml", category: "RTD Cans", unitsPerCase: 24 },
-  { root: "RMC-CLA-220-CAN", sku: "RMC-CLA-220-CAN-C24", name: "Cold Matcha Can Classic 220ml", category: "RTD Cans", unitsPerCase: 24 },
-  { root: "RMC-MAN-220-CAN", sku: "RMC-MAN-220-CAN-C24", name: "Cold Matcha Can Mango 220ml", category: "RTD Cans", unitsPerCase: 24 },
-  { root: "RMC-VAN-220-CAN", sku: "RMC-VAN-220-CAN-C24", name: "Cold Matcha Can Vanilla 220ml", category: "RTD Cans", unitsPerCase: 24 },
+  { root: "CCC-BEL-230-CAN", sku: "CCC-BEL-230-CAN-C24", name: "Cold Coffee Can Belgian Mocha 230ml", category: "RTD Cans", unitsPerCase: 24, casesPerBatch: 646 },
+  { root: "CCC-BLK-230-CAN", sku: "CCC-BLK-230-CAN-C24", name: "Cold Brew Black Coffee Can 230ml", category: "RTD Cans", unitsPerCase: 24, casesPerBatch: 400 },
+  { root: "CCC-CLA-230-CAN", sku: "CCC-CLA-230-CAN-C24", name: "Cold Coffee Can Classic 230ml", category: "RTD Cans", unitsPerCase: 24, casesPerBatch: 646 },
+  { root: "CCC-FVA-230-CAN", sku: "CCC-FVA-230-CAN-C24", name: "Cold Coffee Can French Vanilla 230ml", category: "RTD Cans", unitsPerCase: 24, casesPerBatch: 646 },
+  { root: "CCC-HAZ-230-CAN", sku: "CCC-HAZ-230-CAN-C24", name: "Cold Coffee Can Hazelnut 230ml", category: "RTD Cans", unitsPerCase: 24, casesPerBatch: 646 },
+  { root: "CCC-LAT-230-CAN", sku: "CCC-LAT-230-CAN-C24", name: "Cold Coffee Can Caramel Latte 230ml", category: "RTD Cans", unitsPerCase: 24, casesPerBatch: 646 },
+  { root: "CCC-VIE-230-CAN", sku: "CCC-VIE-230-CAN-C24", name: "Cold Coffee Can Vietnamese 230ml", category: "RTD Cans", unitsPerCase: 24, casesPerBatch: 646 },
+  { root: "RMC-CLA-220-CAN", sku: "RMC-CLA-220-CAN-C24", name: "Cold Matcha Can Classic 220ml", category: "RTD Cans", unitsPerCase: 24, casesPerBatch: 646 },
+  { root: "RMC-MAN-220-CAN", sku: "RMC-MAN-220-CAN-C24", name: "Cold Matcha Can Mango 220ml", category: "RTD Cans", unitsPerCase: 24, casesPerBatch: 646 },
+  { root: "RMC-VAN-220-CAN", sku: "RMC-VAN-220-CAN-C24", name: "Cold Matcha Can Vanilla 220ml", category: "RTD Cans", unitsPerCase: 24, casesPerBatch: 646 },
   // ----- RTD Bottles (12 units / case) -----
-  { root: "RTD-CLA-200-BTL", sku: "RTD-CLA-200-BTL-C12", name: "Ready to Drink Classic 200ml", category: "RTD Bottles", unitsPerCase: 12 },
-  { root: "RTD-HAZ-200-BTL", sku: "RTD-HAZ-200-BTL-C12", name: "Ready to Drink Hazelnut 200ml", category: "RTD Bottles", unitsPerCase: 12 },
+  { root: "RTD-CLA-200-BTL", sku: "RTD-CLA-200-BTL-C12", name: "Ready to Drink Classic 200ml", category: "RTD Bottles", unitsPerCase: 12, casesPerBatch: 800 },
+  { root: "RTD-HAZ-200-BTL", sku: "RTD-HAZ-200-BTL-C12", name: "Ready to Drink Hazelnut 200ml", category: "RTD Bottles", unitsPerCase: 12, casesPerBatch: 800 },
 ];
 
 /** Pack suffixes that represent the standard single-unit case we track.

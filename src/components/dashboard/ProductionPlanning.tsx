@@ -1,11 +1,22 @@
 "use client";
 import { useEffect, useState } from "react";
 import type { SkuRow } from "@/lib/calc/dashboard";
-import { fmtInt, fmtNum, fmtDate } from "@/lib/format";
+import { fmtInt, fmtDate } from "@/lib/format";
+import { SKU_MASTER } from "@/lib/constants";
 
-/** Cases produced per batch. */
-const BATCH_SIZE = 646;
+/** Production batch size (cases) per SKU — from the SKU master. */
+const BATCH_SIZE: Record<string, number> = Object.fromEntries(
+  SKU_MASTER.map((m) => [m.sku, m.casesPerBatch])
+);
+const DEFAULT_BATCH = 646;
 const STORE_KEY = "sleepyowl.prodBatches";
+
+// Display order: regular cans first, then Cold Brew Black, then RTD bottles.
+function orderKey(s: SkuRow): number {
+  if (s.sku === "CCC-BLK-230-CAN-C24") return 1;
+  if (s.category === "RTD Bottles") return 2;
+  return 0;
+}
 
 function nextMonthStartIso(todayIso: string): string {
   const [y, m] = todayIso.split("-").map(Number);
@@ -43,15 +54,18 @@ export function ProductionPlanning({ rows, today }: { rows: SkuRow[]; today: str
     });
   };
 
-  const computed = rows.map((s) => {
-    const totalAvail = s.above70Cases + s.vendorCases; // 70%+ JWL + vendor
-    const pending = Math.max(0, s.demandCases - s.mtdSalesCases); // pending sale this month
-    const shortageCurr = Math.round(pending - totalAvail); // + = shortage, - = surplus
-    const nextOpening = Math.max(0, Math.round(totalAvail - s.salesDrr * daysToNext));
-    const shortageNext = Math.round(s.demandCases - nextOpening); // demand assumed same next month
-    const nb = batches[s.sku] ?? 0;
-    return { s, totalAvail, nextOpening, shortageCurr, shortageNext, nb, prod: nb * BATCH_SIZE };
-  });
+  const computed = [...rows]
+    .sort((a, b) => orderKey(a) - orderKey(b))
+    .map((s) => {
+      const totalAvail = s.above70Cases + s.vendorCases; // 70%+ JWL + vendor
+      const pending = Math.max(0, s.demandCases - s.mtdSalesCases); // pending sale this month
+      const shortageCurr = Math.round(pending - totalAvail); // + = shortage, - = surplus
+      const nextOpening = Math.max(0, Math.round(totalAvail - s.salesDrr * daysToNext));
+      const shortageNext = Math.round(s.demandCases - nextOpening); // demand assumed same next month
+      const nb = batches[s.sku] ?? 0;
+      const batchSize = BATCH_SIZE[s.sku] ?? DEFAULT_BATCH;
+      return { s, totalAvail, nextOpening, shortageCurr, shortageNext, nb, prod: nb * batchSize };
+    });
 
   const T = computed.reduce(
     (a, r) => ({
@@ -167,7 +181,7 @@ export function ProductionPlanning({ rows, today }: { rows: SkuRow[]; today: str
         <strong className="text-[var(--foreground)]">Shortage (this mo)</strong> = (Demand − MTD sales) − Total avail. ·{" "}
         <strong className="text-[var(--foreground)]">Shortage (next mo)</strong> = Demand (same as this month) − Next-mo opening. ·{" "}
         <strong className="text-[var(--foreground)]">Stock-out</strong> = FEFO 70%+ (incl. vendor) at Sales DRR. ·{" "}
-        <strong className="text-[var(--foreground)]">Prod plan</strong> = No. of batches × {BATCH_SIZE} cases (edit the batch count; saved in your browser). Red = shortage, green = covered.
+        <strong className="text-[var(--foreground)]">Prod plan</strong> = No. of batches × cases-per-batch (400 Cold Brew Black, 800 bottles, 646 other cans; edit the batch count — saved in your browser). Red = shortage, green = covered.
       </p>
     </div>
   );
