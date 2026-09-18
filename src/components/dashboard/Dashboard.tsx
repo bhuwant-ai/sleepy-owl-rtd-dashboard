@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   Warehouse,
@@ -46,6 +46,39 @@ export function Dashboard({ data }: { data: DashboardData }) {
     } catch {}
     setDark(next);
   };
+
+  // --- auto-refresh: re-sync + re-render on the hour, 9 AM–9 PM local time ---
+  const [autoOn, setAutoOn] = useState(true);
+  const autoLoaded = useRef(false);
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem("autoRefresh");
+      if (v != null) setAutoOn(v !== "0");
+    } catch {}
+    autoLoaded.current = true;
+  }, []);
+  useEffect(() => {
+    if (!autoLoaded.current) return; // don't overwrite the stored value before it loads
+    try {
+      localStorage.setItem("autoRefresh", autoOn ? "1" : "0");
+    } catch {}
+  }, [autoOn]);
+  const toggleAuto = () => setAutoOn((o) => !o);
+  // Init to the current hour so we don't sync immediately on load — only on the
+  // next hour boundary within the window.
+  const lastAutoHour = useRef<number>(new Date().getHours());
+  useEffect(() => {
+    if (!autoOn) return;
+    const id = setInterval(() => {
+      const h = new Date().getHours();
+      if (h < 9 || h > 21 || lastAutoHour.current === h) return; // window = 09:00–21:00
+      lastAutoHour.current = h;
+      fetch("/api/sync", { method: "POST" })
+        .catch(() => {})
+        .finally(() => startTransition(() => router.refresh()));
+    }, 60_000);
+    return () => clearInterval(id);
+  }, [autoOn, router]);
 
   const skuOptions = data.skus.filter((s) => category === "all" || s.category === category);
 
@@ -168,6 +201,15 @@ export function Dashboard({ data }: { data: DashboardData }) {
                 <RotateCcw className="h-4 w-4" />
               </IconButton>
             )}
+            <button
+              onClick={toggleAuto}
+              aria-pressed={autoOn}
+              title="Auto-refresh the data hourly between 9 AM and 9 PM"
+              className="inline-flex items-center gap-1.5 rounded-lg glass px-2.5 py-1.5 text-[11px] font-medium press focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            >
+              <span className={cn("h-1.5 w-1.5 rounded-full", autoOn ? "bg-[var(--good)]" : "bg-[var(--muted)]")} />
+              {autoOn ? "Auto 9–9" : "Auto off"}
+            </button>
             <button
               onClick={refresh}
               disabled={pending}
