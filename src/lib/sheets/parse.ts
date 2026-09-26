@@ -342,18 +342,33 @@ export function parseSales(aoa: string[][]): ParseResult<SalesMtd[]> {
   return { data, issues };
 }
 
-// ---------- Demand Plan (Sep'26 RTD DP) -----------------------------------
+// ---------- Demand Plan (monthly RTD DP tab) ------------------------------
 // The tab has two stacked sections: cases first, then units (cases x pack
 // size). We take the FIRST occurrence of each tracked "-ONE" SKU, which is the
-// cases figure, from Column C (SKU, index 2) / Column M (total cases, index 12).
+// cases figure. The SKU and Total columns are located by header (tolerant to
+// layout changes between months), falling back to the legacy positions
+// (C = SKU, index 2; M = total, index 12).
 export function parseDemand(aoa: string[][]): ParseResult<DemandPlanEntry[]> {
   const issues: DataQualityIssue[] = [];
   const seen = new Map<string, DemandPlanEntry>();
-  const COL_SKU = 2;
-  const COL_TOTAL_CASES = 12;
+
+  let skuCol = -1;
+  let totalCol = -1;
+  for (let i = 0; i < Math.min(aoa.length, 40); i++) {
+    const cells = aoa[i].map((c) => String(c).trim());
+    const sc = cells.findIndex((c) => /^sku(\s*codes?)?$/i.test(c));
+    const tc = cells.findIndex((c) => /^total$/i.test(c));
+    if (sc >= 0 && tc >= 0) {
+      skuCol = sc;
+      totalCol = tc;
+      break;
+    }
+  }
+  if (skuCol < 0) skuCol = 2;
+  if (totalCol < 0) totalCol = 12;
 
   for (const r of aoa) {
-    const rawSku = cell(r, COL_SKU).trim();
+    const rawSku = cell(r, skuCol).trim();
     if (!rawSku) continue;
     const resolved = resolveSku(rawSku);
     if (!resolved) continue; // packs / untracked / RPC etc.
@@ -363,7 +378,7 @@ export function parseDemand(aoa: string[][]): ParseResult<DemandPlanEntry[]> {
       sku: resolved.sku,
       rootCode: resolved.root,
       category: resolved.category,
-      cases: num(cell(r, COL_TOTAL_CASES)),
+      cases: num(cell(r, totalCol)),
     });
   }
 

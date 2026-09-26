@@ -54,10 +54,10 @@ export const SHEETS = {
     },
   },
   demand: {
-    id: "1E8p7gPV-kCr1EMvbCv_ZC-mkAk7lEhnnlJwzX3cuAH8",
-    // NOTE: the demand tab is named per-month. Update this once each month
+    id: "1IeakZzwmqVnNFuZ6AYxtWXi_0dluU3FtkP8JRBNGVRg",
+    // NOTE: the demand workbook/tab is named per-month. Update this each month
     // (or set DEMAND_TAB in the environment to override).
-    tab: process.env.DEMAND_TAB || "Sep'26 RTD DP",
+    tab: process.env.DEMAND_TAB || "Oct26 RTD DP",
   },
 } as const;
 
