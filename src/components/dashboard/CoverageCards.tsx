@@ -33,22 +33,22 @@ export function CoverageCards({ sales, demand }: { sales: CoverageView; demand: 
 
       {/* the flow */}
       <div className="flex flex-wrap items-stretch gap-2 mb-4">
-        <Flow label="Initial 70%+ stock" value={fmtInt(view.initialAbove70Cases)} unit="cases" />
+        <Flow label="Initial 75%+ stock" value={fmtInt(view.initialAbove70Cases)} unit="cases" />
         <Op>−</Op>
-        <Flow label="Ages below 70% first" value={fmtInt(view.transitionedCases)} unit="cases" tone="warn" />
+        <Flow label="Ages below 75% first" value={fmtInt(view.transitionedCases)} unit="cases" tone="warn" />
         <Op>=</Op>
-        <Flow label="Effective usable 70%+" value={fmtInt(view.consumedAbove70Cases)} unit="cases" tone="good" />
+        <Flow label="Effective usable 75%+" value={fmtInt(view.consumedAbove70Cases)} unit="cases" tone="good" />
         <Op>÷</Op>
         <Flow label={basis === "SALES" ? "Sales DRR" : "Demand DRR"} value={fmtNum(view.totalDrr)} unit="cases/day" />
         <Op>=</Op>
         <Flow label="Coverage" value={fmtDays(view.effectiveCoverageDays)} unit="days" tone="brand" />
       </div>
       <p className="text-[13px] text-[var(--muted)] mb-4 leading-relaxed">
-        Estimated 70%+ stock runs out around{" "}
+        Estimated 75%+ stock runs out around{" "}
         <span className="font-semibold text-[var(--foreground)]">{fmtDate(view.coverageEndDate)}</span> (JWL only, FEFO
         consumption). A naïve “inventory ÷ DRR” would overstate this by counting the{" "}
         <span className="tabnum font-medium text-[var(--warn)]">{fmtInt(view.transitionedCases)}</span> cases that age below
-        70% before they can be sold.
+        75% before they can be sold.
       </p>
 
       <PerSkuTable view={view} />
@@ -100,7 +100,7 @@ function PerSkuTable({ view }: { view: CoverageView }) {
           <tr className="bg-[var(--card)]">
             <th className={th + " text-left"}>SKU</th>
             <th className={th + " text-right"}>DRR</th>
-            <th className={th + " text-right"}>Initial 70%+</th>
+            <th className={th + " text-right"}>Initial 75%+</th>
             <th className={th + " text-right"}>Effective usable</th>
             <th className={th + " text-right"}>Ages out</th>
             <th className={th + " text-right"}>Coverage days</th>
@@ -136,7 +136,7 @@ function PerSkuTable({ view }: { view: CoverageView }) {
                   <tr className="bg-[var(--hover)]">
                     <td colSpan={7} className="px-4 py-3">
                       {activeBatches.length === 0 ? (
-                        <div className="text-[11px] text-[var(--muted)]">No 70%+ batches for this SKU at JWL.</div>
+                        <div className="text-[11px] text-[var(--muted)]">No 75%+ batches for this SKU at JWL.</div>
                       ) : (
                         <table className="w-full text-[11.5px]">
                           <thead>
@@ -144,9 +144,9 @@ function PerSkuTable({ view }: { view: CoverageView }) {
                               <th className="px-2 py-1 text-left font-medium">FEFO #</th>
                               <th className="px-2 py-1 text-left font-medium">Batch</th>
                               <th className="px-2 py-1 text-left font-medium">Mfg</th>
-                              <th className="px-2 py-1 text-left font-medium">Drops ≤70%</th>
+                              <th className="px-2 py-1 text-left font-medium">Drops ≤75%</th>
                               <th className="px-2 py-1 text-right font-medium">Cases</th>
-                              <th className="px-2 py-1 text-right font-medium">Sold &gt;70%</th>
+                              <th className="px-2 py-1 text-right font-medium">Sold &gt;75%</th>
                               <th className="px-2 py-1 text-right font-medium">Aged out</th>
                               <th className="px-2 py-1 text-left font-medium">Status</th>
                             </tr>

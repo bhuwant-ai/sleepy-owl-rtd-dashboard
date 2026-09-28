@@ -57,7 +57,7 @@ export function ProductionPlanning({ rows, today }: { rows: SkuRow[]; today: str
   const computed = [...rows]
     .sort((a, b) => orderKey(a) - orderKey(b))
     .map((s) => {
-      const totalAvail = s.above70Cases + s.vendorCases; // 70%+ JWL + vendor
+      const totalAvail = s.above70Cases + s.vendorCases; // 75%+ JWL + vendor
       const pending = Math.max(0, s.demandCases - s.mtdSalesCases); // pending sale this month
       const shortageCurr = Math.round(pending - totalAvail); // + = shortage, - = surplus
       const nextOpening = Math.max(0, Math.round(totalAvail - s.salesDrr * daysToNext));
@@ -95,7 +95,7 @@ export function ProductionPlanning({ rows, today }: { rows: SkuRow[]; today: str
             <tr>
               <th className={`${th} ${stickyFirst} left-0 z-[2] text-left`}>SKU</th>
               <th className={`${th} text-right`}>Demand (this mo)</th>
-              <th className={`${th} text-right`}>70%+ JWL</th>
+              <th className={`${th} text-right`}>75%+ JWL</th>
               <th className={`${th} text-right`}>Vendor</th>
               <th className={`${th} text-right`}>Total avail</th>
               <th className={`${th} text-right`}>MTD sales</th>
@@ -176,11 +176,11 @@ export function ProductionPlanning({ rows, today }: { rows: SkuRow[]; today: str
         </table>
       </div>
       <p className="mt-3 text-[11px] leading-relaxed text-[var(--muted)]">
-        <strong className="text-[var(--foreground)]">Total avail</strong> = 70%+ JWL + vendor. ·{" "}
+        <strong className="text-[var(--foreground)]">Total avail</strong> = 75%+ JWL + vendor. ·{" "}
         <strong className="text-[var(--foreground)]">Next-mo opening</strong> = Total avail − Sales&nbsp;DRR × {daysToNext} days to {fmtDate(nextStart)} (floored at 0). ·{" "}
         <strong className="text-[var(--foreground)]">Shortage (this mo)</strong> = (Demand − MTD sales) − Total avail. ·{" "}
         <strong className="text-[var(--foreground)]">Shortage (next mo)</strong> = Demand (same as this month) − Next-mo opening. ·{" "}
-        <strong className="text-[var(--foreground)]">Stock-out</strong> = FEFO 70%+ (incl. vendor) at Sales DRR. ·{" "}
+        <strong className="text-[var(--foreground)]">Stock-out</strong> = FEFO 75%+ (incl. vendor) at Sales DRR. ·{" "}
         <strong className="text-[var(--foreground)]">Prod plan</strong> = No. of batches × cases-per-batch (400 Cold Brew Black, 800 bottles, 646 other cans; edit the batch count — saved in your browser). Red = shortage, green = covered.
       </p>
     </div>

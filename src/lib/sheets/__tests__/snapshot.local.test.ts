@@ -77,7 +77,7 @@ const read = (f: string) => (DIR ? readFileSync(join(DIR, f), "utf8") : "");
     console.log("JWL total cases     :", data.kpis.jwlTotalCases);
     console.log("Vendor total cases  :", data.kpis.vendorTotalCases);
     console.log(
-      "Buckets  >70 / 50-70 / <50 :",
+      "Buckets  >75 / 50-75 / <50 :",
       `${data.kpis.above70Cases} (${data.kpis.above70Pct}%)`,
       `/ ${data.kpis.between5070Cases} (${data.kpis.between5070Pct}%)`,
       `/ ${data.kpis.below50Cases} (${data.kpis.below50Pct}%)`
@@ -131,7 +131,7 @@ const read = (f: string) => (DIR ? readFileSync(join(DIR, f), "utf8") : "");
       data.kpis.below50Cases +
       data.kpis.unknownShelfCases;
     expect(recon).toBe(data.kpis.jwlTotalCases);
-    // Coverage conservation: initial 70%+ = consumed + transitioned.
+    // Coverage conservation: initial 75%+ = consumed + transitioned.
     const c = data.coverage.sales;
     expect(Math.round(c.consumedAbove70Cases + c.transitionedCases)).toBe(
       Math.round(c.initialAbove70Cases)

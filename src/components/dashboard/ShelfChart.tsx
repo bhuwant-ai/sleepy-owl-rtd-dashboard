@@ -18,8 +18,8 @@ export function ShelfChart({ above70, between, below, total }: ShelfChartProps) 
   }
 
   const segments = [
-    { key: "above", label: "Above 70%", value: above70, color: "var(--good)" },
-    { key: "between", label: "50–70%", value: between, color: "var(--warn)" },
+    { key: "above", label: "Above 75%", value: above70, color: "var(--good)" },
+    { key: "between", label: "50–75%", value: between, color: "var(--warn)" },
     { key: "below", label: "Below 50%", value: below, color: "var(--bad)" },
   ].filter((s) => s.value > 0);
 
@@ -57,7 +57,7 @@ export function ShelfChart({ above70, between, below, total }: ShelfChartProps) 
             {fmtPct(abovePct, 0)}
           </text>
           <text x="60" y="72" textAnchor="middle" style={{ fontSize: 7.5, fill: "var(--muted)", letterSpacing: "0.12em" }}>
-            ABOVE 70%
+            ABOVE 75%
           </text>
         </svg>
       </div>

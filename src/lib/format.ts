@@ -46,14 +46,14 @@ export const BUCKET_META: Record<
   ShelfBucket,
   { label: string; color: string; bg: string; text: string }
 > = {
-  ABOVE_70: { label: "Above 70%", color: "#15803d", bg: "var(--good-bg)", text: "var(--good)" },
-  BETWEEN_50_70: { label: "50–70%", color: "#b45309", bg: "var(--warn-bg)", text: "var(--warn)" },
+  ABOVE_70: { label: "Above 75%", color: "#15803d", bg: "var(--good-bg)", text: "var(--good)" },
+  BETWEEN_50_70: { label: "50–75%", color: "#b45309", bg: "var(--warn-bg)", text: "var(--warn)" },
   BELOW_50: { label: "Below 50%", color: "#b91c1c", bg: "var(--bad-bg)", text: "var(--bad)" },
 };
 
 export const COVERAGE_STATUS_LABEL: Record<string, string> = {
-  FULLY_CONSUMED: "Sold while >70%",
+  FULLY_CONSUMED: "Sold while >75%",
   PARTIAL_TRANSITION: "Partly aged out",
   FULLY_TRANSITIONED: "Aged out unsold",
-  ALREADY_BELOW_70: "Already ≤70%",
+  ALREADY_BELOW_70: "Already ≤75%",
 };

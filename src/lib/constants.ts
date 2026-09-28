@@ -61,8 +61,8 @@ export const SHEETS = {
   },
 } as const;
 
-/** The remaining-shelf-life threshold for "70%+" stock, as a percentage. */
-export const SHELF_LIFE_THRESHOLD_PCT = 70;
+/** The remaining-shelf-life threshold for "75%+" stock, as a percentage. */
+export const SHELF_LIFE_THRESHOLD_PCT = 75;
 
 /**
  * The "today" that drives every time-based calculation.

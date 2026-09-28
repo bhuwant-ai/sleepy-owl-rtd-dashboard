@@ -1,37 +1,37 @@
 /**
- * FEFO 70%+ stock-coverage simulation.
+ * FEFO 75%+ stock-coverage simulation.
  * =====================================
  *
  * THE PROBLEM
  * -----------
  * We want to know: "For how many days can we keep meeting demand using ONLY
- * inventory that is above 70% remaining shelf life?"
+ * inventory that is above 75% remaining shelf life?"
  *
- * The naive answer — `current 70%+ inventory / daily run rate` — is WRONG,
- * because some of that inventory will itself drop below 70% (age out) before
- * we ever get to sell it. Those cases must NOT be counted as usable 70%+
+ * The naive answer — `current 75%+ inventory / daily run rate` — is WRONG,
+ * because some of that inventory will itself drop below 75% (age out) before
+ * we ever get to sell it. Those cases must NOT be counted as usable 75%+
  * coverage.
  *
  * THE METHOD (daily simulation, First-Expiry-First-Out)
  * -----------------------------------------------------
  * Starting today, we step forward one day at a time. On each day:
- *   1. Any batch that has crossed below 70% is removed from the usable pool.
+ *   1. Any batch that has crossed below 75% is removed from the usable pool.
  *      Whatever quantity was left in it is recorded as
- *      "transitioned below 70% before consumption".
- *   2. From the batches still above 70%, we consume that day's demand (DRR),
+ *      "transitioned below 75% before consumption".
+ *   2. From the batches still above 75%, we consume that day's demand (DRR),
  *      taking from the earliest-expiring batch first (FEFO), spilling over to
  *      the next batch when one is emptied.
- *   3. Repeat until no 70%+ inventory remains.
+ *   3. Repeat until no 75%+ inventory remains.
  *
- * Every case of the starting 70%+ pool therefore ends up either
- *   - CONSUMED while still above 70% (this is the effective usable stock), or
- *   - TRANSITIONED below 70% before we could sell it.
- * so: initial 70%+  =  consumed  +  transitioned.
+ * Every case of the starting 75%+ pool therefore ends up either
+ *   - CONSUMED while still above 75% (this is the effective usable stock), or
+ *   - TRANSITIONED below 75% before we could sell it.
+ * so: initial 75%+  =  consumed  +  transitioned.
  *
  * Effective coverage (days)  =  consumed / DRR.
  *
  * Day 1 of the simulation represents "today". A batch that first drops to
- * <=70% `k` days from today is therefore usable on simulation days 1..k.
+ * <=75% `k` days from today is therefore usable on simulation days 1..k.
  *
  * The simulation is intentionally per-SKU: demand for one SKU can only consume
  * that same SKU's inventory. Overall/category figures are obtained by running
@@ -45,15 +45,15 @@ export interface FefoBatchInput {
   cases: number;
   /** Expiry date — drives FEFO ordering (earliest expiry consumed first). */
   expDate: Date;
-  /** Date this batch first drops to <=70% remaining shelf life. */
+  /** Date this batch first drops to <=75% remaining shelf life. */
   date70: Date;
 }
 
 export type FefoBatchStatus =
-  | "ALREADY_BELOW_70" // was <=70% at the start; excluded from the pool
-  | "FULLY_CONSUMED" // entirely sold while still above 70%
-  | "PARTIAL_TRANSITION" // partly sold, remainder aged below 70%
-  | "FULLY_TRANSITIONED"; // never reached before it aged below 70%
+  | "ALREADY_BELOW_70" // was <=75% at the start; excluded from the pool
+  | "FULLY_CONSUMED" // entirely sold while still above 75%
+  | "PARTIAL_TRANSITION" // partly sold, remainder aged below 75%
+  | "FULLY_TRANSITIONED"; // never reached before it aged below 75%
 
 export interface FefoBatchResult {
   batchId: string;
@@ -67,17 +67,17 @@ export interface FefoBatchResult {
 
 export interface FefoResult {
   drr: number;
-  /** Cases that were strictly above 70% at the start (the usable pool). */
+  /** Cases that were strictly above 75% at the start (the usable pool). */
   initialAbove70Cases: number;
-  /** Cases already at/below 70% at the start (excluded from the pool). */
+  /** Cases already at/below 75% at the start (excluded from the pool). */
   alreadyBelow70Cases: number;
-  /** Cases sold while still above 70% — the true usable coverage. */
+  /** Cases sold while still above 75% — the true usable coverage. */
   consumedAbove70Cases: number;
-  /** Cases that aged below 70% before they could be sold. */
+  /** Cases that aged below 75% before they could be sold. */
   transitionedCases: number;
   /** consumed / DRR. Infinity when there is no demand. */
   effectiveCoverageDays: number;
-  /** Approximate date the 70%+ pool is exhausted (null if never / no demand). */
+  /** Approximate date the 75%+ pool is exhausted (null if never / no demand). */
   coverageEndDate: Date | null;
   batches: FefoBatchResult[];
 }
@@ -97,9 +97,9 @@ export function simulateFefoCoverage(
   drr: number,
   today: Date
 ): FefoResult {
-  // ---- 1. Split into the starting 70%+ pool vs. already-below-70% ----------
-  // daysAbove70 = how many days (starting today) the batch stays > 70%.
-  // If its 70% date is today or earlier, it is already <=70% -> excluded.
+  // ---- 1. Split into the starting 75%+ pool vs. already-below-75% ----------
+  // daysAbove70 = how many days (starting today) the batch stays > 75%.
+  // If its 75% date is today or earlier, it is already <=75% -> excluded.
   type Work = FefoBatchInput & {
     remaining: number;
     daysAbove70: number;
@@ -126,7 +126,7 @@ export function simulateFefoCoverage(
   const pool = work.filter((w) => w.eligible);
   const initialAbove70Cases = sum(pool.map((w) => w.cases));
 
-  // ---- 2. FEFO ordering: earliest expiry first, then earliest 70% date -----
+  // ---- 2. FEFO ordering: earliest expiry first, then earliest 75% date -----
   pool.sort((a, b) => {
     const e = a.expDate.getTime() - b.expDate.getTime();
     if (e !== 0) return e;
@@ -136,7 +136,7 @@ export function simulateFefoCoverage(
   });
   pool.forEach((w, i) => (w.priority = i + 1));
 
-  // No demand -> the 70%+ pool is never consumed; coverage is effectively
+  // No demand -> the 75%+ pool is never consumed; coverage is effectively
   // unbounded for the purposes of this metric.
   if (drr <= EPS) {
     return finalize(work, pool, {
@@ -152,7 +152,7 @@ export function simulateFefoCoverage(
 
   // ---- 3. Step forward one day at a time -----------------------------------
   for (let day = 1; day <= MAX_SIM_DAYS; day++) {
-    // 3a. Retire batches that have crossed below 70% before this day.
+    // 3a. Retire batches that have crossed below 75% before this day.
     for (const w of pool) {
       if (w.remaining > EPS && w.daysAbove70 < day) {
         w.transitioned += w.remaining;

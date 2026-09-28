@@ -52,8 +52,8 @@ export function BatchTable({ rows }: { rows: BatchRow[] }) {
         </select>
         <select value={bucket} onChange={(e) => setBucket(e.target.value as typeof bucket)} className={ctrl} aria-label="Shelf-life bucket">
           <option value="all">All shelf-life</option>
-          <option value="ABOVE_70">Above 70%</option>
-          <option value="BETWEEN_50_70">50–70%</option>
+          <option value="ABOVE_70">Above 75%</option>
+          <option value="BETWEEN_50_70">50–75%</option>
           <option value="BELOW_50">Below 50%</option>
           <option value="UNKNOWN">Unknown</option>
         </select>
@@ -70,7 +70,7 @@ export function BatchTable({ rows }: { rows: BatchRow[] }) {
               <th className={th + " text-left"}>Mfg date</th>
               <th className={th + " text-right"}>Cases</th>
               <th className={th + " text-right"}>Shelf life</th>
-              <th className={th + " text-left"}>70% date</th>
+              <th className={th + " text-left"}>75% date</th>
               <th className={th + " text-left"}>Bucket</th>
             </tr>
           </thead>

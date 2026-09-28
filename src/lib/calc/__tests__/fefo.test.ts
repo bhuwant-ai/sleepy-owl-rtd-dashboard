@@ -1,5 +1,5 @@
 /**
- * Tests for the FEFO 70%+ coverage simulation.
+ * Tests for the FEFO 75%+ coverage simulation.
  * These mirror the exact scenarios in the project brief (Tests 1-6).
  */
 import { describe, it, expect } from "vitest";
@@ -10,8 +10,8 @@ const TODAY = new Date(2026, 8, 10); // 10-Sep-2026 (month is 0-based)
 
 /**
  * Build a batch.
- * @param daysAbove70  how many days from today it stays strictly > 70%
- *                     (0 or negative => already at/below 70% today)
+ * @param daysAbove70  how many days from today it stays strictly > 75%
+ *                     (0 or negative => already at/below 75% today)
  * @param expOffset    expiry offset in days from today (controls FEFO order)
  */
 function batch(id: string, cases: number, daysAbove70: number, expOffset: number): FefoBatchInput {
@@ -41,8 +41,8 @@ describe("Test 1 — simple coverage (nothing ages out before it is sold)", () =
 });
 
 describe("Test 2 — the worked example from the brief", () => {
-  // DRR 50/day. Batch A: 500 cases, below-70% in 2 days (earliest expiry).
-  //             Batch B: 1500 cases, below-70% in 30 days.
+  // DRR 50/day. Batch A: 500 cases, below-75% in 2 days (earliest expiry).
+  //             Batch B: 1500 cases, below-75% in 30 days.
   const r = simulateFefoCoverage(
     [batch("A", 500, 2, 10), batch("B", 1500, 30, 200)],
     50,
@@ -52,10 +52,10 @@ describe("Test 2 — the worked example from the brief", () => {
   it("keeps physical vs usable inventory distinct", () => {
     expect(r.initialAbove70Cases).toBe(2000);
   });
-  it("counts only stock sold while above 70% as usable", () => {
+  it("counts only stock sold while above 75% as usable", () => {
     expect(r.consumedAbove70Cases).toBe(1500);
   });
-  it("records stock that aged below 70% before it could be sold", () => {
+  it("records stock that aged below 75% before it could be sold", () => {
     expect(r.transitionedCases).toBe(500);
   });
   it("gives 30 days of coverage (NOT the naive 2000/50 = 40)", () => {
@@ -119,12 +119,12 @@ describe("Test 4 — partial consumption spills across batches in one day", () =
   });
 });
 
-describe("Test 5 — a batch already below 70% is excluded from the start", () => {
-  it("does not count already-below-70% stock in the usable pool", () => {
+describe("Test 5 — a batch already below 75% is excluded from the start", () => {
+  it("does not count already-below-75% stock in the usable pool", () => {
     const r = simulateFefoCoverage(
       [
-        batch("OLD", 500, 0, 1), // exactly at 70% today -> excluded
-        batch("PAST", 300, -5, 1), // already past 70% -> excluded
+        batch("OLD", 500, 0, 1), // exactly at 75% today -> excluded
+        batch("PAST", 300, -5, 1), // already past 75% -> excluded
         batch("GOOD", 500, 50, 10),
       ],
       50,
@@ -141,8 +141,8 @@ describe("Test 5 — a batch already below 70% is excluded from the start", () =
   });
 });
 
-describe("Test 6 — exactly 70% is treated as NOT eligible (strictly above 70%)", () => {
-  it("excludes a batch whose 70% date is today", () => {
+describe("Test 6 — exactly 75% is treated as NOT eligible (strictly above 75%)", () => {
+  it("excludes a batch whose 75% date is today", () => {
     const r = simulateFefoCoverage([batch("EXACT", 1000, 0, 5)], 50, TODAY);
     expect(r.initialAbove70Cases).toBe(0);
     expect(r.alreadyBelow70Cases).toBe(1000);

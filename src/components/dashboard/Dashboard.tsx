@@ -142,8 +142,8 @@ export function Dashboard({ data }: { data: DashboardData }) {
 
   const kpis = [
     { label: "Total JWL", value: fmtInt(k.jwl), sub: "Racks + Low Shelf Life", accent: "var(--primary)", icon: <Warehouse className="h-4 w-4" /> },
-    { label: "Above 70%", value: fmtInt(k.above), sub: `${fmtPct(k.abovePct)} of JWL`, accent: "var(--good)", icon: <ShieldCheck className="h-4 w-4" /> },
-    { label: "50–70%", value: fmtInt(k.between), sub: `${fmtPct(k.betweenPct)} of JWL`, accent: "var(--warn)", icon: <Clock3 className="h-4 w-4" /> },
+    { label: "Above 75%", value: fmtInt(k.above), sub: `${fmtPct(k.abovePct)} of JWL`, accent: "var(--good)", icon: <ShieldCheck className="h-4 w-4" /> },
+    { label: "50–75%", value: fmtInt(k.between), sub: `${fmtPct(k.betweenPct)} of JWL`, accent: "var(--warn)", icon: <Clock3 className="h-4 w-4" /> },
     { label: "Below 50%", value: fmtInt(k.below), sub: `${fmtPct(k.belowPct)} of JWL`, accent: "var(--bad)", icon: <AlertTriangle className="h-4 w-4" /> },
     { label: "At Vendor", value: fmtInt(k.vendor), sub: "Lotus (separate)", accent: "var(--brand-sky)", icon: <Truck className="h-4 w-4" /> },
   ];
@@ -227,7 +227,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
 
       <main className="mx-auto max-w-[1400px] px-4 sm:px-6 py-6 space-y-6">
         <p className="text-[11px] text-[var(--muted)] -mt-1">
-          Coverage &amp; DOH use <strong className="text-[var(--foreground)]">JWL only</strong>; “70%+” means strictly above 70% remaining shelf life.
+          Coverage &amp; DOH use <strong className="text-[var(--foreground)]">JWL only</strong>; “75%+” means strictly above 75% remaining shelf life.
         </p>
 
         {/* Section 1 — Inventory overview */}
@@ -278,8 +278,8 @@ export function Dashboard({ data }: { data: DashboardData }) {
           </div>
           <div className="xl:col-span-2 anim-in" style={{ animationDelay: "0.15s" }}>
             <SectionCard
-              title="70%+ stock coverage (FEFO)"
-              subtitle="How long JWL stock above 70% shelf life lasts, accounting for batches that age out"
+              title="75%+ stock coverage (FEFO)"
+              subtitle="How long JWL stock above 75% shelf life lasts, accounting for batches that age out"
             >
               <CoverageCards sales={salesCov} demand={demandCov} />
             </SectionCard>
@@ -297,7 +297,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
         <div className="anim-in" style={{ animationDelay: "0.22s" }}>
           <SectionCard
             title="Supply & stock-out plan (incl. vendor)"
-            subtitle="Per-SKU warehouse + vendor stock, 70%+ coverage including vendor, projected next-month opening and stock-out date"
+            subtitle="Per-SKU warehouse + vendor stock, 75%+ coverage including vendor, projected next-month opening and stock-out date"
           >
             <SupplyTable rows={filteredSkus} batches={batchesFiltered} today={data.today} />
           </SectionCard>
@@ -315,7 +315,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
 
         {/* Section 4 — batch table */}
         <div className="anim-in" style={{ animationDelay: "0.25s" }}>
-          <SectionCard title="Batch / vendor inventory" subtitle="Every batch × location with shelf-life status and 70% date">
+          <SectionCard title="Batch / vendor inventory" subtitle="Every batch × location with shelf-life status and 75% date">
             <BatchTable rows={batchesFiltered} />
           </SectionCard>
         </div>

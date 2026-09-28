@@ -7,11 +7,11 @@
  *
  * Scope rule (per business decision):
  *   - JWL inventory = JWL Racks + Low Shelf Life
- *   - DOH and 70%+ coverage are computed on JWL only
+ *   - DOH and 75%+ coverage are computed on JWL only
  *   - Vendor (Lotus) stock is reported separately as a KPI
  */
 import { addDays, daysBetween } from "./dates";
-import { shelfLifeSnapshot, seventyPercentDate, type ShelfBucket } from "./shelfLife";
+import { shelfLifeSnapshot, seventyPercentDate, SHELF_THRESHOLD_PCT, type ShelfBucket } from "./shelfLife";
 import { getMonthContext, salesDrr, demandDrr, doh } from "./drr";
 import { simulateFefoCoverage, type FefoBatchInput } from "./fefo";
 import { SKU_MASTER } from "../constants";
@@ -52,8 +52,8 @@ export interface SkuRow {
   salesDoh: number | null; // null = infinite (no run rate)
   demandDoh: number | null;
   // Supply/stock-out planning (incl. vendor), sales-DRR FEFO simulation.
-  above70InclVendorCases: number; // JWL >70% + vendor >70% (eligible today)
-  stockoutInclVendorDate: string | null; // FEFO 70%+ coverage end date (JWL+vendor)
+  above70InclVendorCases: number; // JWL >75% + vendor >75% (eligible today)
+  stockoutInclVendorDate: string | null; // FEFO 75%+ coverage end date (JWL+vendor)
   stockoutInclVendorDays: number | null;
 }
 
@@ -81,7 +81,7 @@ export interface BatchRow {
   cases: number;
   remainingPct: number | null;
   bucket: ShelfBucket | null;
-  date70: string | null; // ISO date the batch drops to <=70%
+  date70: string | null; // ISO date the batch drops to <=75%
 }
 
 export interface CoverageBatchRow {
@@ -210,7 +210,7 @@ export function computeDashboard(input: DashboardInput, today: Date): DashboardD
     const sDrr = salesDrr(mtd, month.elapsedDays);
     const dDrr = demandDrr(dem, month.daysInMonth);
 
-    // Stock-out incl. vendor: same FEFO 70%+ simulation as the coverage
+    // Stock-out incl. vendor: same FEFO 75%+ simulation as the coverage
     // section, but over JWL + vendor batches, at the sales DRR.
     const fefoInputs: FefoBatchInput[] = [...jwlB, ...vendB]
       .filter((b) => b.mfd && b.date70 && b.totalDays)
@@ -395,7 +395,7 @@ export function computeDashboard(input: DashboardInput, today: Date): DashboardD
     generatedAt: new Date().toISOString(),
     today: isoDate(today)!,
     month: { label: month.monthLabel, elapsedDays: month.elapsedDays, daysInMonth: month.daysInMonth },
-    config: { thresholdPct: 70, coverageScope: "JWL only" },
+    config: { thresholdPct: SHELF_THRESHOLD_PCT, coverageScope: "JWL only" },
     kpis,
     excluded,
     categories,

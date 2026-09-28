@@ -8,17 +8,29 @@
  *   remaining %  =  (EXP - today) / (EXP - MFD)  x 100
  *
  * We classify inventory into three buckets by remaining %:
- *   - ABOVE_70     : strictly greater than 70%
- *   - BETWEEN_50_70: 50% up to and including 70%
+ *   - ABOVE_70     : strictly greater than 75%   ("75%+" good stock)
+ *   - BETWEEN_50_70: 50% up to and including 75%
  *   - BELOW_50     : less than 50%
  *
- * (Business decision: inventory at exactly 70.00% is NOT counted as "70%+".
- *  It falls into the 50-70% bucket.)
+ * (Business decision: inventory at exactly 75.00% is NOT counted as "75%+".
+ *  It falls into the 50-75% bucket.)
+ *
+ * NOTE: the enum keys (ABOVE_70, BETWEEN_50_70) are historical identifiers and
+ * are kept stable across threshold changes; only the numeric threshold and the
+ * human labels move. Change SHELF_THRESHOLD_PCT below to retune the constraint.
  */
 import { addDays, daysBetween } from "./dates";
 
-/** The single source of truth for the "70%+" threshold, as a fraction. */
-export const SEVENTY_PCT = 0.7;
+/**
+ * The single source of truth for the "good stock" shelf-life threshold, as a
+ * percentage. Stock with strictly MORE than this % of shelf life remaining is
+ * counted as "75%+" (the eligible pool for coverage, supply and production).
+ */
+export const SHELF_THRESHOLD_PCT = 75;
+/** Lower boundary of the middle ("watch") bucket, as a percentage. */
+export const MID_BUCKET_FLOOR_PCT = 50;
+/** The threshold expressed as a fraction (0-1). */
+const THRESHOLD_FRACTION = SHELF_THRESHOLD_PCT / 100;
 
 export type ShelfBucket = "ABOVE_70" | "BETWEEN_50_70" | "BELOW_50";
 
@@ -28,7 +40,7 @@ export interface ShelfLifeSnapshot {
   remainingDays: number; // EXP - today
   remainingPct: number; // 0-100
   bucket: ShelfBucket;
-  /** Date the batch first drops to <= 70% (i.e. is no longer "70%+"). */
+  /** Date the batch first drops to <= threshold (i.e. is no longer "75%+"). */
   date70: Date;
 }
 
@@ -60,36 +72,36 @@ export function shelfLifeSnapshot(
 }
 
 /**
- * The date a batch reaches the 70% threshold — defined as the first calendar
- * day on which its remaining shelf life is <= 70% (i.e. no longer eligible as
- * "70%+" stock).
+ * The date a batch reaches the threshold — defined as the first calendar day
+ * on which its remaining shelf life is <= the threshold (i.e. no longer
+ * eligible as "75%+" stock).
  *
- * remaining% <= 70%  <=>  elapsed days >= 30% of total shelf life.
- * We take the ceiling so that, e.g., a 273-day batch (30% = 81.9 days) is
- * still >70% on day 81 and first drops to <=70% on day 82.
+ * remaining% <= 75%  <=>  elapsed days >= 25% of total shelf life.
+ * We take the ceiling so that, e.g., a 273-day batch (25% = 68.25 days) is
+ * still >75% on day 68 and first drops to <=75% on day 69.
  */
 export function seventyPercentDate(mfd: Date, totalShelfLifeDays: number): Date {
   // Subtract a tiny epsilon before ceil() so that floating-point noise
-  // (e.g. 0.3 * 100 === 30.000000000000004) doesn't push a clean whole-day
+  // (e.g. 0.25 * 100 === 25.000000000000004) doesn't push a clean whole-day
   // threshold up by an extra day.
-  const daysUntil = Math.ceil((1 - SEVENTY_PCT) * totalShelfLifeDays - 1e-9);
+  const daysUntil = Math.ceil((1 - THRESHOLD_FRACTION) * totalShelfLifeDays - 1e-9);
   return addDays(mfd, daysUntil);
 }
 
 /**
  * Classify a remaining-% figure into a bucket.
- *  > 70        -> ABOVE_70
- *  50 .. 70    -> BETWEEN_50_70   (70 exactly lands here)
+ *  > 75        -> ABOVE_70        ("75%+")
+ *  50 .. 75    -> BETWEEN_50_70   (75 exactly lands here)
  *  < 50        -> BELOW_50
  */
 export function classifyBucket(remainingPct: number): ShelfBucket {
-  if (remainingPct > 70) return "ABOVE_70";
-  if (remainingPct >= 50) return "BETWEEN_50_70";
+  if (remainingPct > SHELF_THRESHOLD_PCT) return "ABOVE_70";
+  if (remainingPct >= MID_BUCKET_FLOOR_PCT) return "BETWEEN_50_70";
   return "BELOW_50";
 }
 
 export const BUCKET_LABELS: Record<ShelfBucket, string> = {
-  ABOVE_70: "Above 70%",
-  BETWEEN_50_70: "50%–70%",
-  BELOW_50: "Below 50%",
+  ABOVE_70: `Above ${SHELF_THRESHOLD_PCT}%`,
+  BETWEEN_50_70: `${MID_BUCKET_FLOOR_PCT}%–${SHELF_THRESHOLD_PCT}%`,
+  BELOW_50: `Below ${MID_BUCKET_FLOOR_PCT}%`,
 };

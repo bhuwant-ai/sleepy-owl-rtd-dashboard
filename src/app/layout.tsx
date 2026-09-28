@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Sleepy Owl — RTD Inventory Dashboard",
-  description: "Inventory, shelf-life and 70%+ stock coverage for RTD Cans & Bottles",
+  description: "Inventory, shelf-life and 75%+ stock coverage for RTD Cans & Bottles",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

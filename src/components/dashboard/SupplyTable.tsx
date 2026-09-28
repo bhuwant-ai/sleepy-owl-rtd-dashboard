@@ -39,12 +39,12 @@ export function SupplyTable({ rows, batches, today }: { rows: SkuRow[]; batches:
             <tr>
               <th className={`${th} ${stickyFirst} left-0 z-[2] text-left`}>SKU</th>
               <th className={`${th} text-right`}>Warehouse (JWL)</th>
-              <th className={`${th} text-right`}>&gt;70% (JWL)</th>
+              <th className={`${th} text-right`}>&gt;75% (JWL)</th>
               <th className={`${th} text-right`}>Sales DRR</th>
               <th className={`${th} text-left`}>Vendor (by mfg date)</th>
-              <th className={`${th} text-right`}>70%+ incl. vendor</th>
+              <th className={`${th} text-right`}>75%+ incl. vendor</th>
               <th className={`${th} text-right`}>Proj. opening {fmtDate(nextStart)}</th>
-              <th className={`${th} text-left`}>Stock-out (70%+ incl. vendor)</th>
+              <th className={`${th} text-left`}>Stock-out (75%+ incl. vendor)</th>
             </tr>
           </thead>
           <tbody>
@@ -52,9 +52,9 @@ export function SupplyTable({ rows, batches, today }: { rows: SkuRow[]; batches:
               const vb = (vendorBySku.get(s.sku) || [])
                 .slice()
                 .sort((a, b) => (a.mfd || "").localeCompare(b.mfd || ""));
-              // 70%+ incl. vendor and the stock-out date come from the same
-              // FEFO 70%+ simulation as the coverage section (JWL + vendor,
-              // sales DRR) — accounts for batches ageing below 70% before sale.
+              // 75%+ incl. vendor and the stock-out date come from the same
+              // FEFO 75%+ simulation as the coverage section (JWL + vendor,
+              // sales DRR) — accounts for batches ageing below 75% before sale.
               const total70incl = s.above70InclVendorCases;
               const totalPhysical = s.jwlCases + s.vendorCases;
               const opening = Math.max(0, Math.round(totalPhysical - s.salesDrr * daysToNext));
@@ -74,7 +74,7 @@ export function SupplyTable({ rows, batches, today }: { rows: SkuRow[]; batches:
                         {vb.map((x, i) => (
                           <div key={i} className="text-[11px] text-[var(--muted)] tabnum whitespace-nowrap">
                             {fmtInt(x.cases)} · {fmtDate(x.mfd)}
-                            {x.bucket && x.bucket !== "ABOVE_70" ? " (≤70%)" : ""}
+                            {x.bucket && x.bucket !== "ABOVE_70" ? " (≤75%)" : ""}
                           </div>
                         ))}
                       </div>
@@ -112,9 +112,9 @@ export function SupplyTable({ rows, batches, today }: { rows: SkuRow[]; batches:
       <p className="mt-3 text-[11px] leading-relaxed text-[var(--muted)]">
         <strong className="text-[var(--foreground)]">Warehouse (JWL)</strong> = current sellable JWL stock (excludes non-sellable/expired). ·{" "}
         <strong className="text-[var(--foreground)]">Vendor</strong> listed per manufacturing date (Lotus). ·{" "}
-        <strong className="text-[var(--foreground)]">70%+ incl. vendor</strong> = JWL &gt;70% + vendor &gt;70%. ·{" "}
+        <strong className="text-[var(--foreground)]">75%+ incl. vendor</strong> = JWL &gt;75% + vendor &gt;75%. ·{" "}
         <strong className="text-[var(--foreground)]">Proj. opening</strong> = (JWL + vendor) − Sales&nbsp;DRR × {daysToNext} days to {fmtDate(nextStart)}, floored at 0. ·{" "}
-        <strong className="text-[var(--foreground)]">Stock-out</strong> = the FEFO 70%+ coverage end date (same daily simulation as the coverage section, over JWL + vendor batches, at Sales&nbsp;DRR — accounts for batches dropping below 70% before they are sold).
+        <strong className="text-[var(--foreground)]">Stock-out</strong> = the FEFO 75%+ coverage end date (same daily simulation as the coverage section, over JWL + vendor batches, at Sales&nbsp;DRR — accounts for batches dropping below 75% before they are sold).
       </p>
     </div>
   );
