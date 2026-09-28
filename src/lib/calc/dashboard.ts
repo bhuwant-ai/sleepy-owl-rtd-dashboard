@@ -53,6 +53,8 @@ export interface SkuRow {
   demandDoh: number | null;
   // Supply/stock-out planning (incl. vendor), sales-DRR FEFO simulation.
   above70InclVendorCases: number; // JWL >75% + vendor >75% (eligible today)
+  usableInclVendorCases: number; // FEFO: cases sellable while still >75% (incl vendor) at sales DRR
+  agesOutInclVendorCases: number; // FEFO: cases that drop below 75% before they can be sold
   stockoutInclVendorDate: string | null; // FEFO 75%+ coverage end date (JWL+vendor)
   stockoutInclVendorDays: number | null;
 }
@@ -238,6 +240,8 @@ export function computeDashboard(input: DashboardInput, today: Date): DashboardD
       salesDoh: finiteOrNull(round1(doh(jwlCases, sDrr))),
       demandDoh: finiteOrNull(round1(doh(jwlCases, dDrr))),
       above70InclVendorCases: round1(fefoInclVendor.initialAbove70Cases),
+      usableInclVendorCases: round1(fefoInclVendor.consumedAbove70Cases),
+      agesOutInclVendorCases: round1(fefoInclVendor.transitionedCases),
       stockoutInclVendorDate: isoDate(fefoInclVendor.coverageEndDate),
       stockoutInclVendorDays: finiteOrNull(round1(fefoInclVendor.effectiveCoverageDays)),
     };

@@ -57,14 +57,17 @@ export function ProductionPlanning({ rows, today }: { rows: SkuRow[]; today: str
   const computed = [...rows]
     .sort((a, b) => orderKey(a) - orderKey(b))
     .map((s) => {
-      const totalAvail = s.above70Cases + s.vendorCases; // 75%+ JWL + vendor
+      // Usable = FEFO stock sellable while still >75% (incl. vendor) at the sales
+      // DRR — the SAME simulation that drives the stock-out date. Cases that age
+      // below 75% before they can be sold are NOT counted (that gap is agesOut).
+      const usable = s.usableInclVendorCases;
       const pending = Math.max(0, s.demandCases - s.mtdSalesCases); // pending sale this month
-      const shortageCurr = Math.round(pending - totalAvail); // + = shortage, - = surplus
-      const nextOpening = Math.max(0, Math.round(totalAvail - s.salesDrr * daysToNext));
+      const shortageCurr = Math.round(pending - usable); // + = shortage, - = surplus
+      const nextOpening = Math.max(0, Math.round(usable - s.salesDrr * daysToNext));
       const shortageNext = Math.round(s.demandCases - nextOpening); // demand assumed same next month
       const nb = batches[s.sku] ?? 0;
       const batchSize = BATCH_SIZE[s.sku] ?? DEFAULT_BATCH;
-      return { s, totalAvail, nextOpening, shortageCurr, shortageNext, nb, prod: nb * batchSize };
+      return { s, usable, nextOpening, shortageCurr, shortageNext, nb, prod: nb * batchSize };
     });
 
   const T = computed.reduce(
@@ -72,14 +75,14 @@ export function ProductionPlanning({ rows, today }: { rows: SkuRow[]; today: str
       demand: a.demand + r.s.demandCases,
       above70: a.above70 + r.s.above70Cases,
       vendor: a.vendor + r.s.vendorCases,
-      avail: a.avail + r.totalAvail,
+      usable: a.usable + r.usable,
       mtd: a.mtd + r.s.mtdSalesCases,
       opening: a.opening + r.nextOpening,
       shortC: a.shortC + Math.max(0, r.shortageCurr),
       shortN: a.shortN + Math.max(0, r.shortageNext),
       prod: a.prod + r.prod,
     }),
-    { demand: 0, above70: 0, vendor: 0, avail: 0, mtd: 0, opening: 0, shortC: 0, shortN: 0, prod: 0 }
+    { demand: 0, above70: 0, vendor: 0, usable: 0, mtd: 0, opening: 0, shortC: 0, shortN: 0, prod: 0 }
   );
 
   const th =
@@ -97,7 +100,7 @@ export function ProductionPlanning({ rows, today }: { rows: SkuRow[]; today: str
               <th className={`${th} text-right`}>Demand (this mo)</th>
               <th className={`${th} text-right`}>75%+ JWL</th>
               <th className={`${th} text-right`}>Vendor</th>
-              <th className={`${th} text-right`}>Total avail</th>
+              <th className={`${th} text-right`}>Usable (FEFO)</th>
               <th className={`${th} text-right`}>MTD sales</th>
               <th className={`${th} text-right`}>Next-mo opening</th>
               <th className={`${th} text-right`}>Shortage (this mo)</th>
@@ -108,7 +111,7 @@ export function ProductionPlanning({ rows, today }: { rows: SkuRow[]; today: str
             </tr>
           </thead>
           <tbody>
-            {computed.map(({ s, totalAvail, nextOpening, shortageCurr, shortageNext, nb, prod }) => (
+            {computed.map(({ s, usable, nextOpening, shortageCurr, shortageNext, nb, prod }) => (
               <tr key={s.sku} className="border-b border-[var(--hairline)] last:border-0 hover:bg-[var(--hover)] transition-colors">
                 <td className={`${stickyFirst} px-3 py-2.5`}>
                   <div className="font-medium leading-tight">{s.name}</div>
@@ -117,7 +120,12 @@ export function ProductionPlanning({ rows, today }: { rows: SkuRow[]; today: str
                 <td className="px-3 py-2.5 text-right tabnum">{fmtInt(s.demandCases)}</td>
                 <td className="px-3 py-2.5 text-right tabnum" style={{ color: "var(--good)" }}>{fmtInt(s.above70Cases)}</td>
                 <td className="px-3 py-2.5 text-right tabnum">{fmtInt(s.vendorCases)}</td>
-                <td className="px-3 py-2.5 text-right tabnum font-semibold">{fmtInt(totalAvail)}</td>
+                <td
+                  className="px-3 py-2.5 text-right tabnum font-semibold"
+                  title={`On hand (75%+ JWL + vendor): ${fmtInt(s.above70Cases + s.vendorCases)} · ages below 75% before sale: ${fmtInt(s.agesOutInclVendorCases)}`}
+                >
+                  {fmtInt(usable)}
+                </td>
                 <td className="px-3 py-2.5 text-right tabnum">{fmtInt(s.mtdSalesCases)}</td>
                 <td className="px-3 py-2.5 text-right tabnum">{fmtInt(nextOpening)}</td>
                 <td className="px-3 py-2.5 text-right tabnum font-medium" style={{ color: shortColor(shortageCurr) }}>
@@ -163,7 +171,7 @@ export function ProductionPlanning({ rows, today }: { rows: SkuRow[]; today: str
               <td className="px-3 py-2.5 text-right tabnum">{fmtInt(T.demand)}</td>
               <td className="px-3 py-2.5 text-right tabnum">{fmtInt(T.above70)}</td>
               <td className="px-3 py-2.5 text-right tabnum">{fmtInt(T.vendor)}</td>
-              <td className="px-3 py-2.5 text-right tabnum">{fmtInt(T.avail)}</td>
+              <td className="px-3 py-2.5 text-right tabnum">{fmtInt(T.usable)}</td>
               <td className="px-3 py-2.5 text-right tabnum">{fmtInt(T.mtd)}</td>
               <td className="px-3 py-2.5 text-right tabnum">{fmtInt(T.opening)}</td>
               <td className="px-3 py-2.5 text-right tabnum" style={{ color: "var(--bad)" }}>{fmtInt(T.shortC)}</td>
@@ -176,9 +184,9 @@ export function ProductionPlanning({ rows, today }: { rows: SkuRow[]; today: str
         </table>
       </div>
       <p className="mt-3 text-[11px] leading-relaxed text-[var(--muted)]">
-        <strong className="text-[var(--foreground)]">Total avail</strong> = 75%+ JWL + vendor. ·{" "}
-        <strong className="text-[var(--foreground)]">Next-mo opening</strong> = Total avail − Sales&nbsp;DRR × {daysToNext} days to {fmtDate(nextStart)} (floored at 0). ·{" "}
-        <strong className="text-[var(--foreground)]">Shortage (this mo)</strong> = (Demand − MTD sales) − Total avail. ·{" "}
+        <strong className="text-[var(--foreground)]">Usable (FEFO)</strong> = 75%+ stock (JWL + vendor) you can actually sell before it drops below 75%, from the same FEFO simulation as the stock-out date — the rest ages out (hover for the on-hand vs aged-out split). ·{" "}
+        <strong className="text-[var(--foreground)]">Next-mo opening</strong> = Usable − Sales&nbsp;DRR × {daysToNext} days to {fmtDate(nextStart)} (floored at 0). ·{" "}
+        <strong className="text-[var(--foreground)]">Shortage (this mo)</strong> = (Demand − MTD sales) − Usable. ·{" "}
         <strong className="text-[var(--foreground)]">Shortage (next mo)</strong> = Demand (same as this month) − Next-mo opening. ·{" "}
         <strong className="text-[var(--foreground)]">Stock-out</strong> = FEFO 75%+ (incl. vendor) at Sales DRR. ·{" "}
         <strong className="text-[var(--foreground)]">Prod plan</strong> = No. of batches × cases-per-batch (400 Cold Brew Black, 800 bottles, 646 other cans; edit the batch count — saved in your browser). Red = shortage, green = covered.

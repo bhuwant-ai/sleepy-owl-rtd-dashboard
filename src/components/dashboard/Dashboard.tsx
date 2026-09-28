@@ -25,6 +25,7 @@ import { BatchTable } from "./BatchTable";
 import { CoverageCards } from "./CoverageCards";
 import { SupplyTable } from "./SupplyTable";
 import { ProductionPlanning } from "./ProductionPlanning";
+import { ShelfDropTable } from "./ShelfDropTable";
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
@@ -310,6 +311,16 @@ export function Dashboard({ data }: { data: DashboardData }) {
             subtitle="Demand vs available, current & next-month shortages, and an editable batch → production plan"
           >
             <ProductionPlanning rows={filteredSkus} today={data.today} />
+          </SectionCard>
+        </div>
+
+        {/* Section 3d — Stock crossing below 75% (aging schedule) */}
+        <div className="anim-in" style={{ animationDelay: "0.26s" }}>
+          <SectionCard
+            title="Stock crossing below 75%"
+            subtitle="Currently-75%+ stock and the date each batch drops to 75% remaining shelf life — the stock that ages out of the usable pool"
+          >
+            <ShelfDropTable batches={batchesFiltered} today={data.today} />
           </SectionCard>
         </div>
 
