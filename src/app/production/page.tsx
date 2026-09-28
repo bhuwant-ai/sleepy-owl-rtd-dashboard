@@ -49,7 +49,7 @@ export default async function ProductionPage() {
       </header>
 
       <main className="mx-auto flex w-full min-h-0 max-w-[1600px] flex-1 flex-col px-4 sm:px-6 py-4">
-        <ProductionPlanning rows={data.skus} today={data.today} />
+        <ProductionPlanning rows={data.skus} batches={data.batches} today={data.today} />
       </main>
     </div>
   );
