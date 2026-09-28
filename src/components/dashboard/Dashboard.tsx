@@ -14,6 +14,7 @@ import {
   Moon,
   Ban,
   CalendarX,
+  Factory,
 } from "lucide-react";
 import type { DashboardData, CoverageView } from "@/lib/calc/dashboard";
 import type { Category } from "@/lib/types";
@@ -23,8 +24,8 @@ import { ShelfChart } from "./ShelfChart";
 import { SkuTable } from "./SkuTable";
 import { BatchTable } from "./BatchTable";
 import { CoverageCards } from "./CoverageCards";
+import Link from "next/link";
 import { SupplyTable } from "./SupplyTable";
-import { ProductionPlanning } from "./ProductionPlanning";
 import { ShelfDropTable } from "./ShelfDropTable";
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -202,6 +203,14 @@ export function Dashboard({ data }: { data: DashboardData }) {
                 <RotateCcw className="h-4 w-4" />
               </IconButton>
             )}
+            <Link
+              href="/production"
+              title="Open the full-screen production planning view"
+              className="inline-flex items-center gap-1.5 rounded-lg glass px-2.5 py-1.5 text-[11px] font-medium press focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            >
+              <Factory className="h-3.5 w-3.5" />
+              Production
+            </Link>
             <button
               onClick={toggleAuto}
               aria-pressed={autoOn}
@@ -301,16 +310,6 @@ export function Dashboard({ data }: { data: DashboardData }) {
             subtitle="Per-SKU warehouse + vendor stock, 75%+ coverage including vendor, projected next-month opening and stock-out date"
           >
             <SupplyTable rows={filteredSkus} batches={batchesFiltered} today={data.today} />
-          </SectionCard>
-        </div>
-
-        {/* Section 3c — Production planning (editable batches → prod plan) */}
-        <div className="anim-in" style={{ animationDelay: "0.24s" }}>
-          <SectionCard
-            title="Production planning"
-            subtitle="Demand vs available, current & next-month shortages, and an editable batch → production plan"
-          >
-            <ProductionPlanning rows={filteredSkus} today={data.today} />
           </SectionCard>
         </div>
 

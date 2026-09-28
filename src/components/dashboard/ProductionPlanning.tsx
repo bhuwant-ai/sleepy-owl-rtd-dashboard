@@ -29,6 +29,11 @@ function daysBetweenIso(aIso: string, bIso: string): number {
   return Math.round((new Date(by, bm - 1, bd).getTime() - new Date(ay, am - 1, ad).getTime()) / 86400000);
 }
 
+/**
+ * Production planning table — dense, sized to fit one screen without scrolling.
+ * Rendered full-height on the dedicated /production page (the parent supplies
+ * the height via a flex container).
+ */
 export function ProductionPlanning({ rows, today }: { rows: SkuRow[]; today: string }) {
   const nextStart = nextMonthStartIso(today);
   const daysToNext = Math.max(0, daysBetweenIso(today, nextStart));
@@ -86,67 +91,81 @@ export function ProductionPlanning({ rows, today }: { rows: SkuRow[]; today: str
   );
 
   const th =
-    "sticky top-0 z-[1] bg-[var(--card)] px-3 py-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)] border-b border-[var(--border)]";
-  const stickyFirst = "sticky left-0 z-[1] bg-[var(--card)] shadow-[7px_0_12px_-10px_rgba(15,23,42,0.25)]";
+    "sticky top-0 z-[1] bg-[var(--card)] px-2 py-1.5 text-[9.5px] font-semibold uppercase tracking-[0.08em] leading-tight text-[var(--muted)] border-b border-[var(--border)] align-bottom";
+  const td = "px-2 py-1 tabnum";
   const shortColor = (v: number) => (v > 0 ? "var(--bad)" : "var(--good)");
 
   return (
-    <div>
-      <div className="scroll-x rounded-xl border border-[var(--hairline)]">
-        <table className="w-full min-w-[1120px] border-collapse text-[12.5px]">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-[var(--hairline)]">
+        <table className="w-full table-fixed border-collapse text-[11.5px]">
+          <colgroup>
+            <col style={{ width: "15%" }} />
+            <col style={{ width: "8%" }} />
+            <col style={{ width: "8%" }} />
+            <col style={{ width: "7%" }} />
+            <col style={{ width: "8%" }} />
+            <col style={{ width: "6%" }} />
+            <col style={{ width: "8%" }} />
+            <col style={{ width: "8%" }} />
+            <col style={{ width: "8%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "7%" }} />
+            <col style={{ width: "7%" }} />
+          </colgroup>
           <thead>
             <tr>
-              <th className={`${th} ${stickyFirst} left-0 z-[2] text-left`}>SKU</th>
-              <th className={`${th} text-right`}>Demand (this mo)</th>
+              <th className={`${th} text-left`}>SKU</th>
+              <th className={`${th} text-right`}>Demand</th>
               <th className={`${th} text-right`}>75%+ JWL</th>
               <th className={`${th} text-right`}>Vendor</th>
               <th className={`${th} text-right`}>Usable (FEFO)</th>
-              <th className={`${th} text-right`}>MTD sales</th>
-              <th className={`${th} text-right`}>Next-mo opening</th>
-              <th className={`${th} text-right`}>Shortage (this mo)</th>
-              <th className={`${th} text-right`}>Shortage (next mo)</th>
-              <th className={`${th} text-left`}>Stock-out (sales DRR)</th>
-              <th className={`${th} text-right`}>No. of batches</th>
+              <th className={`${th} text-right`}>MTD</th>
+              <th className={`${th} text-right`}>Next open</th>
+              <th className={`${th} text-right`}>Short (this mo)</th>
+              <th className={`${th} text-right`}>Short (next mo)</th>
+              <th className={`${th} text-left`}>Stock-out</th>
+              <th className={`${th} text-right`}>Batches</th>
               <th className={`${th} text-right`}>Prod plan</th>
             </tr>
           </thead>
           <tbody>
             {computed.map(({ s, usable, nextOpening, shortageCurr, shortageNext, nb, prod }) => (
               <tr key={s.sku} className="border-b border-[var(--hairline)] last:border-0 hover:bg-[var(--hover)] transition-colors">
-                <td className={`${stickyFirst} px-3 py-2.5`}>
-                  <div className="font-medium leading-tight">{s.name}</div>
-                  <div className="text-[10px] text-[var(--muted)]">{s.sku}</div>
+                <td className="px-2 py-1">
+                  <div className="truncate font-medium leading-tight" title={s.name}>{s.name}</div>
+                  <div className="text-[9px] leading-tight text-[var(--muted)]">{s.sku}</div>
                 </td>
-                <td className="px-3 py-2.5 text-right tabnum">{fmtInt(s.demandCases)}</td>
-                <td className="px-3 py-2.5 text-right tabnum" style={{ color: "var(--good)" }}>{fmtInt(s.above70Cases)}</td>
-                <td className="px-3 py-2.5 text-right tabnum">{fmtInt(s.vendorCases)}</td>
+                <td className={`${td} text-right`}>{fmtInt(s.demandCases)}</td>
+                <td className={`${td} text-right`} style={{ color: "var(--good)" }}>{fmtInt(s.above70Cases)}</td>
+                <td className={`${td} text-right`}>{fmtInt(s.vendorCases)}</td>
                 <td
-                  className="px-3 py-2.5 text-right tabnum font-semibold"
+                  className={`${td} text-right font-semibold`}
                   title={`On hand (75%+ JWL + vendor): ${fmtInt(s.above70Cases + s.vendorCases)} · ages below 75% before sale: ${fmtInt(s.agesOutInclVendorCases)}`}
                 >
                   {fmtInt(usable)}
                 </td>
-                <td className="px-3 py-2.5 text-right tabnum">{fmtInt(s.mtdSalesCases)}</td>
-                <td className="px-3 py-2.5 text-right tabnum">{fmtInt(nextOpening)}</td>
-                <td className="px-3 py-2.5 text-right tabnum font-medium" style={{ color: shortColor(shortageCurr) }}>
+                <td className={`${td} text-right`}>{fmtInt(s.mtdSalesCases)}</td>
+                <td className={`${td} text-right`}>{fmtInt(nextOpening)}</td>
+                <td className={`${td} text-right font-medium`} style={{ color: shortColor(shortageCurr) }}>
                   {shortageCurr > 0 ? fmtInt(shortageCurr) : "0"}
                 </td>
-                <td className="px-3 py-2.5 text-right tabnum font-medium" style={{ color: shortColor(shortageNext) }}>
+                <td className={`${td} text-right font-medium`} style={{ color: shortColor(shortageNext) }}>
                   {shortageNext > 0 ? fmtInt(shortageNext) : "0"}
                 </td>
-                <td className="px-3 py-2.5 whitespace-nowrap">
+                <td className="px-2 py-1 whitespace-nowrap leading-tight">
                   {s.stockoutInclVendorDate ? (
                     <>
                       <span className="tabnum">{fmtDate(s.stockoutInclVendorDate)}</span>
                       {s.stockoutInclVendorDays != null && (
-                        <span className="ml-1 text-[11px] text-[var(--muted)] tabnum">({Math.floor(s.stockoutInclVendorDays)}d)</span>
+                        <span className="ml-1 text-[10px] text-[var(--muted)] tabnum">({Math.floor(s.stockoutInclVendorDays)}d)</span>
                       )}
                     </>
                   ) : (
-                    <span className="text-[var(--muted)]">— (no sales)</span>
+                    <span className="text-[var(--muted)]">—</span>
                   )}
                 </td>
-                <td className="px-2 py-1.5 text-right">
+                <td className="px-2 py-1 text-right">
                   <input
                     type="number"
                     min={0}
@@ -156,10 +175,10 @@ export function ProductionPlanning({ rows, today }: { rows: SkuRow[]; today: str
                     onChange={(e) => setBatch(s.sku, e.target.value)}
                     placeholder="0"
                     aria-label={`Batches for ${s.sku}`}
-                    className="w-16 rounded-md border border-[var(--border)] bg-white px-2 py-1 text-right text-[12.5px] tabnum text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] dark:bg-transparent"
+                    className="w-14 rounded-md border border-[var(--border)] bg-white px-1.5 py-0.5 text-right text-[11.5px] tabnum text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] dark:bg-transparent"
                   />
                 </td>
-                <td className="px-3 py-2.5 text-right tabnum font-semibold" style={{ color: prod > 0 ? "var(--primary)" : "var(--muted)" }}>
+                <td className={`${td} text-right font-semibold`} style={{ color: prod > 0 ? "var(--primary)" : "var(--muted)" }}>
                   {fmtInt(prod)}
                 </td>
               </tr>
@@ -167,29 +186,27 @@ export function ProductionPlanning({ rows, today }: { rows: SkuRow[]; today: str
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-[var(--primary)] bg-[color-mix(in_oklab,var(--primary)_7%,transparent)] font-semibold">
-              <td className={`${stickyFirst} px-3 py-2.5`} style={{ background: "color-mix(in oklab, var(--primary) 7%, var(--card))" }}>Total</td>
-              <td className="px-3 py-2.5 text-right tabnum">{fmtInt(T.demand)}</td>
-              <td className="px-3 py-2.5 text-right tabnum">{fmtInt(T.above70)}</td>
-              <td className="px-3 py-2.5 text-right tabnum">{fmtInt(T.vendor)}</td>
-              <td className="px-3 py-2.5 text-right tabnum">{fmtInt(T.usable)}</td>
-              <td className="px-3 py-2.5 text-right tabnum">{fmtInt(T.mtd)}</td>
-              <td className="px-3 py-2.5 text-right tabnum">{fmtInt(T.opening)}</td>
-              <td className="px-3 py-2.5 text-right tabnum" style={{ color: "var(--bad)" }}>{fmtInt(T.shortC)}</td>
-              <td className="px-3 py-2.5 text-right tabnum" style={{ color: "var(--bad)" }}>{fmtInt(T.shortN)}</td>
-              <td className="px-3 py-2.5" />
-              <td className="px-3 py-2.5" />
-              <td className="px-3 py-2.5 text-right tabnum" style={{ color: "var(--primary)" }}>{fmtInt(T.prod)}</td>
+              <td className="px-2 py-1.5">Total</td>
+              <td className={`${td} text-right`}>{fmtInt(T.demand)}</td>
+              <td className={`${td} text-right`}>{fmtInt(T.above70)}</td>
+              <td className={`${td} text-right`}>{fmtInt(T.vendor)}</td>
+              <td className={`${td} text-right`}>{fmtInt(T.usable)}</td>
+              <td className={`${td} text-right`}>{fmtInt(T.mtd)}</td>
+              <td className={`${td} text-right`}>{fmtInt(T.opening)}</td>
+              <td className={`${td} text-right`} style={{ color: "var(--bad)" }}>{fmtInt(T.shortC)}</td>
+              <td className={`${td} text-right`} style={{ color: "var(--bad)" }}>{fmtInt(T.shortN)}</td>
+              <td className="px-2 py-1.5" />
+              <td className="px-2 py-1.5" />
+              <td className={`${td} text-right`} style={{ color: "var(--primary)" }}>{fmtInt(T.prod)}</td>
             </tr>
           </tfoot>
         </table>
       </div>
-      <p className="mt-3 text-[11px] leading-relaxed text-[var(--muted)]">
-        <strong className="text-[var(--foreground)]">Usable (FEFO)</strong> = 75%+ stock (JWL + vendor) you can actually sell before it drops below 75%, from the same FEFO simulation as the stock-out date — the rest ages out (hover for the on-hand vs aged-out split). ·{" "}
-        <strong className="text-[var(--foreground)]">Next-mo opening</strong> = Usable − Sales&nbsp;DRR × {daysToNext} days to {fmtDate(nextStart)} (floored at 0). ·{" "}
-        <strong className="text-[var(--foreground)]">Shortage (this mo)</strong> = (Demand − MTD sales) − Usable. ·{" "}
-        <strong className="text-[var(--foreground)]">Shortage (next mo)</strong> = Demand (same as this month) − Next-mo opening. ·{" "}
-        <strong className="text-[var(--foreground)]">Stock-out</strong> = FEFO 75%+ (incl. vendor) at Sales DRR. ·{" "}
-        <strong className="text-[var(--foreground)]">Prod plan</strong> = No. of batches × cases-per-batch (400 Cold Brew Black, 800 bottles, 646 other cans; edit the batch count — saved in your browser). Red = shortage, green = covered.
+      <p className="mt-2 shrink-0 text-[10.5px] leading-snug text-[var(--muted)]">
+        <strong className="text-[var(--foreground)]">Usable (FEFO)</strong> = 75%+ stock (JWL + vendor) sellable before it drops below 75% — same sim as the stock-out date; the rest ages out (hover a Usable cell). ·{" "}
+        <strong className="text-[var(--foreground)]">Next open</strong> = Usable − Sales&nbsp;DRR × {daysToNext}d to {fmtDate(nextStart)}. ·{" "}
+        <strong className="text-[var(--foreground)]">Short (this mo)</strong> = (Demand − MTD) − Usable · <strong className="text-[var(--foreground)]">Short (next mo)</strong> = Demand − Next open. ·{" "}
+        <strong className="text-[var(--foreground)]">Prod plan</strong> = Batches × size (400 Cold Brew Black · 800 bottles · 646 other cans). Red = shortage, green = covered.
       </p>
     </div>
   );
