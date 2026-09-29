@@ -12,7 +12,17 @@ const DEFAULT_BATCH = 646;
 const STORE_KEY = "sleepyowl.prodBatches";
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-// Display order: regular cans first, then Cold Brew Black, then RTD bottles.
+/** Which co-packer produces each SKU. Amrit makes the two bottles + Cold Brew
+ *  Black; everything else is Lotus. */
+const AMRIT_SKUS = new Set([
+  "RTD-CLA-200-BTL-C12",
+  "RTD-HAZ-200-BTL-C12",
+  "CCC-BLK-230-CAN-C24",
+]);
+type Maker = "Amrit" | "Lotus";
+const makerOf = (sku: string): Maker => (AMRIT_SKUS.has(sku) ? "Amrit" : "Lotus");
+
+// Default display order: regular cans first, then Cold Brew Black, then bottles.
 function orderKey(s: SkuRow): number {
   if (s.sku === "CCC-BLK-230-CAN-C24") return 1;
   if (s.category === "RTD Bottles") return 2;
@@ -34,11 +44,6 @@ function monthShort(iso: string): string {
 function shortDate(iso: string): string {
   const [, m, d] = iso.split("-");
   return `${d} ${MONTHS[Number(m) - 1]}`;
-}
-function daysBetweenIso(aIso: string, bIso: string): number {
-  const [ay, am, ad] = aIso.split("-").map(Number);
-  const [by, bm, bd] = bIso.split("-").map(Number);
-  return Math.round((new Date(by, bm - 1, bd).getTime() - new Date(ay, am - 1, ad).getTime()) / 86400000);
 }
 
 /** Per-SKU list of currently-75%+ batches (JWL + vendor) with the date each drops to <=75%. */
@@ -63,12 +68,15 @@ function buildDropSchedule(batches: BatchRow[]): Map<string, Array<{ date: strin
   return out;
 }
 
+type ColId =
+  | "sku" | "sep" | "demand" | "jwl" | "vendor" | "total" | "opening"
+  | "going" | "dates" | "shortOct" | "shortNov" | "stockout" | "batches" | "prod";
+const NUMERIC = new Set<ColId>(["sep", "demand", "jwl", "vendor", "total", "opening", "going", "shortOct", "shortNov", "batches", "prod"]);
+
 /**
  * Production planning table — dense, sized to fit one screen without scrolling.
- * Rendered full-height on the dedicated /production page.
- *
- * Columns are framed around the demand month (the month after `today`, i.e.
- * October when planning at end-September) and the following month (November).
+ * Filterable by co-packer (Amrit / Lotus) and sortable by every column.
+ * Columns are framed around the demand month (the month after `today`).
  */
 export function ProductionPlanning({
   rows,
@@ -85,6 +93,15 @@ export function ProductionPlanning({
   const octLabel = monthShort(octStart); // "Oct"
   const novLabel = monthShort(novStart); // "Nov"
   const scheduleBySku = buildDropSchedule(batches);
+
+  const [maker, setMaker] = useState<"all" | Maker>("all");
+  const [sort, setSort] = useState<{ key: ColId; dir: "asc" | "desc" } | null>(null);
+  const onSort = (key: ColId) =>
+    setSort((p) =>
+      p && p.key === key
+        ? { key, dir: p.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: NUMERIC.has(key) ? "desc" : "asc" }
+    );
 
   // Editable per-SKU batch counts, persisted in the browser.
   const [batchCounts, setBatchCounts] = useState<Record<string, number>>({});
@@ -107,25 +124,59 @@ export function ProductionPlanning({
     });
   };
 
-  const computed = [...rows]
-    .sort((a, b) => orderKey(a) - orderKey(b))
+  const makerCounts = {
+    Amrit: rows.filter((s) => makerOf(s.sku) === "Amrit").length,
+    Lotus: rows.filter((s) => makerOf(s.sku) === "Lotus").length,
+  };
+
+  const built = rows
+    .filter((s) => maker === "all" || makerOf(s.sku) === maker)
     .map((s) => {
       const schedule = scheduleBySku.get(s.sku) ?? [];
       const totalStock = s.above70Cases + s.vendorCases; // 75%+ JWL + all vendor
-      // Current 75%+ stock still >=75% at the start of the demand month.
       const opening75 = schedule.filter((x) => x.date >= octStart).reduce((a, x) => a + x.cases, 0);
-      // Of that, the cases that cross below 75% DURING the demand month, by date.
       const octDrops = schedule.filter((x) => x.date >= octStart && x.date < novStart);
       const goingOct = octDrops.reduce((a, x) => a + x.cases, 0);
-      // Usable = FEFO 75%+ stock (incl vendor) sellable before it ages below 75%.
-      const usable = s.usableInclVendorCases;
+      const usable = s.usableInclVendorCases; // FEFO 75%+ sellable before it ages
       const octShort = Math.max(0, Math.round(s.demandCases - usable));
-      const novOpening = Math.max(0, Math.round(usable - s.demandCases)); // usable left after Oct demand
-      const novShort = Math.max(0, Math.round(s.demandCases - novOpening)); // Nov demand assumed = Oct
+      const novOpening = Math.max(0, Math.round(usable - s.demandCases));
+      const novShort = Math.max(0, Math.round(s.demandCases - novOpening));
       const nb = batchCounts[s.sku] ?? 0;
       const prod = nb * (BATCH_SIZE[s.sku] ?? DEFAULT_BATCH);
       return { s, totalStock, opening75, goingOct, octDrops, octShort, novShort, nb, prod };
     });
+  type Row = (typeof built)[number];
+
+  const valueFor = (r: Row, key: ColId): number | string => {
+    switch (key) {
+      case "sku": return r.s.name;
+      case "sep": return r.s.mtdSalesCases;
+      case "demand": return r.s.demandCases;
+      case "jwl": return r.s.above70Cases;
+      case "vendor": return r.s.vendorCases;
+      case "total": return r.totalStock;
+      case "opening": return r.opening75;
+      case "going": return r.goingOct;
+      case "dates": return r.octDrops[0]?.date ?? "9999-99-99";
+      case "shortOct": return r.octShort;
+      case "shortNov": return r.novShort;
+      case "stockout": return r.s.stockoutInclVendorDate ?? "9999-99-99";
+      case "batches": return r.nb;
+      case "prod": return r.prod;
+    }
+  };
+
+  const computed = [...built];
+  if (sort) {
+    computed.sort((a, b) => {
+      const va = valueFor(a, sort.key);
+      const vb = valueFor(b, sort.key);
+      const r = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb));
+      return sort.dir === "asc" ? r : -r;
+    });
+  } else {
+    computed.sort((a, b) => orderKey(a.s) - orderKey(b.s));
+  }
 
   const T = computed.reduce(
     (a, r) => ({
@@ -144,12 +195,41 @@ export function ProductionPlanning({
   );
 
   const th =
-    "sticky top-0 z-[1] bg-[var(--card)] px-2 py-1.5 text-[9.5px] font-semibold uppercase tracking-[0.05em] leading-tight text-[var(--muted)] border-b border-[var(--border)] align-bottom";
+    "sticky top-0 z-[1] bg-[var(--card)] px-2 py-1.5 text-[9.5px] font-semibold uppercase tracking-[0.05em] leading-tight text-[var(--muted)] border-b border-[var(--border)] align-bottom cursor-pointer select-none hover:text-[var(--foreground)]";
   const td = "px-2 py-1 tabnum";
   const shortColor = (v: number) => (v > 0 ? "var(--bad)" : "var(--good)");
+  const arrow = (id: ColId) => (sort?.key === id ? (sort.dir === "asc" ? " ▲" : " ▼") : "");
+  const headCell = (id: ColId, label: string, align: "left" | "right" = "right") => (
+    <th className={`${th} ${align === "left" ? "text-left" : "text-right"}`} onClick={() => onSort(id)} title="Click to sort">
+      {label}
+      {arrow(id)}
+    </th>
+  );
+
+  const filterBtn = (m: "all" | Maker, label: string) =>
+    `rounded-md px-2.5 py-1 text-[11px] font-medium press focus:outline-none focus:ring-2 focus:ring-[var(--ring)] ${
+      maker === m ? "bg-[var(--primary)] text-[var(--primary-foreground)]" : "glass"
+    }`;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      {/* Filter toolbar */}
+      <div className="mb-2 flex shrink-0 flex-wrap items-center gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Maker</span>
+        <button className={filterBtn("all", "All")} onClick={() => setMaker("all")} aria-pressed={maker === "all"}>
+          All <span className="opacity-70">({rows.length})</span>
+        </button>
+        <button className={filterBtn("Lotus", "Lotus")} onClick={() => setMaker("Lotus")} aria-pressed={maker === "Lotus"}>
+          Lotus <span className="opacity-70">({makerCounts.Lotus})</span>
+        </button>
+        <button className={filterBtn("Amrit", "Amrit")} onClick={() => setMaker("Amrit")} aria-pressed={maker === "Amrit"}>
+          Amrit <span className="opacity-70">({makerCounts.Amrit})</span>
+        </button>
+        <span className="ml-auto text-[10px] text-[var(--muted)]">
+          Click any column header to sort{sort ? " · click again to reverse" : ""}
+        </span>
+      </div>
+
       <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-[var(--hairline)]">
         <table className="w-full table-fixed border-collapse text-[11.5px]">
           <colgroup>
@@ -170,20 +250,20 @@ export function ProductionPlanning({
           </colgroup>
           <thead>
             <tr>
-              <th className={`${th} text-left`}>SKU</th>
-              <th className={`${th} text-right`}>{sepLabel} MTD sales</th>
-              <th className={`${th} text-right`}>{octLabel} demand</th>
-              <th className={`${th} text-right`}>75%+ JWL</th>
-              <th className={`${th} text-right`}>Vendor</th>
-              <th className={`${th} text-right`}>Total stock</th>
-              <th className={`${th} text-right`}>Opening 75%+ · 1 {octLabel}</th>
-              <th className={`${th} text-right`}>Going ≤75% ({octLabel})</th>
-              <th className={`${th} text-left`}>Dates ≤75% ({octLabel})</th>
-              <th className={`${th} text-right`}>Short ({octLabel})</th>
-              <th className={`${th} text-right`}>Short ({novLabel})</th>
-              <th className={`${th} text-left`}>Stock-out</th>
-              <th className={`${th} text-right`}>Batches</th>
-              <th className={`${th} text-right`}>Prod plan</th>
+              {headCell("sku", "SKU", "left")}
+              {headCell("sep", `${sepLabel} MTD sales`)}
+              {headCell("demand", `${octLabel} demand`)}
+              {headCell("jwl", "75%+ JWL")}
+              {headCell("vendor", "Vendor")}
+              {headCell("total", "Total stock")}
+              {headCell("opening", `Opening 75%+ · 1 ${octLabel}`)}
+              {headCell("going", `Going ≤75% (${octLabel})`)}
+              {headCell("dates", `Dates ≤75% (${octLabel})`, "left")}
+              {headCell("shortOct", `Short (${octLabel})`)}
+              {headCell("shortNov", `Short (${novLabel})`)}
+              {headCell("stockout", "Stock-out", "left")}
+              {headCell("batches", "Batches")}
+              {headCell("prod", "Prod plan")}
             </tr>
           </thead>
           <tbody>
@@ -248,7 +328,7 @@ export function ProductionPlanning({
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-[var(--primary)] bg-[color-mix(in_oklab,var(--primary)_7%,transparent)] font-semibold">
-              <td className="px-2 py-1.5">Total</td>
+              <td className="px-2 py-1.5">Total{maker !== "all" ? ` · ${maker}` : ""}</td>
               <td className={`${td} text-right`}>{fmtInt(T.sep)}</td>
               <td className={`${td} text-right`}>{fmtInt(T.dem)}</td>
               <td className={`${td} text-right`}>{fmtInt(T.jwl)}</td>
@@ -267,6 +347,7 @@ export function ProductionPlanning({
         </table>
       </div>
       <p className="mt-2 shrink-0 text-[10.5px] leading-snug text-[var(--muted)]">
+        <strong className="text-[var(--foreground)]">Maker</strong>: Amrit makes the two bottles + Cold Brew Black; Lotus makes the rest. ·{" "}
         <strong className="text-[var(--foreground)]">{sepLabel} MTD sales</strong> = month-to-date sales · <strong className="text-[var(--foreground)]">{octLabel} demand</strong> = demand plan. ·{" "}
         <strong className="text-[var(--foreground)]">Total stock</strong> = 75%+ JWL + all vendor. ·{" "}
         <strong className="text-[var(--foreground)]">Opening 75%+ · 1 {octLabel}</strong> = current 75%+ stock (JWL + vendor) still ≥75% on 1 {octLabel}. ·{" "}
